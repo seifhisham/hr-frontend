@@ -34,6 +34,7 @@ import {
   api,
   dateLabel,
   initials,
+  locationLabel,
   send,
   time,
   type Attendance,
@@ -48,20 +49,36 @@ import { PasswordField } from "./password-field";
 import Link from "next/link";
 import { CorrectionEditor, EmployeeEditor, ScheduleEditor } from "./editors";
 import { Requests } from "./requests";
+import { Payroll } from "./payroll";
+import { Reports } from "./reports";
+import { Departments } from "./departments";
+import { Notifications } from "./notifications";
+import { Sales } from "./sales";
+import { ManagerWorkspace } from "./manager-workspace";
 
 type View =
   | "overview"
   | "attendance"
+  | "departments"
   | "employees"
   | "schedules"
   | "audit"
   | "requests"
+  | "manager-reviews"
+  | "reports"
+  | "payroll"
+  | "sales"
   | "settings"
   | "account";
 const navigation: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "attendance", label: "Attendance", icon: Clock3 },
   { id: "requests", label: "Requests", icon: ClipboardList },
+  { id: "manager-reviews", label: "Manager reviews", icon: ClipboardList },
+  { id: "reports", label: "Reports", icon: ClipboardList },
+  { id: "payroll", label: "Payroll", icon: CalendarDays },
+  { id: "sales", label: "Sales performance", icon: Building2 },
+  { id: "departments", label: "Departments", icon: Building2 },
   { id: "employees", label: "Employees", icon: Users },
   { id: "schedules", label: "Work schedules", icon: CalendarDays },
   { id: "audit", label: "Activity log", icon: History },
@@ -109,6 +126,9 @@ export default function Dashboard() {
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [navigationOpen]);
+  const [departmentCatalog, setDepartmentCatalog] = useState<
+    { name: string; managerEmployeeId?: string }[]
+  >([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [records, setRecords] = useState<Attendance[]>([]);
@@ -157,20 +177,32 @@ export default function Dashboard() {
     };
   }, []);
   const loadCore = useCallback(async () => {
-    if (!session || session.user.role === "employee") return;
-    const [people, shifts, today] = await Promise.all([
+    if (
+      !session ||
+      session.user.role === "employee" ||
+      session.user.role === "manager"
+    )
+      return;
+    const [people, shifts, today, catalog] = await Promise.all([
       api<Employee[]>("/employees"),
       api<Schedule[]>("/schedules"),
       api<Attendance[]>(
         `/attendance?from=${session.today}&to=${session.today}`,
       ),
+      api<{ name: string; managerEmployeeId?: string }[]>("/departments"),
     ]);
+    setDepartmentCatalog(catalog);
     setEmployees(people);
     setSchedules(shifts);
     setTodayRecords(today);
   }, [session]);
   useEffect(() => {
-    if (!session || session.user.role === "employee") return;
+    if (
+      !session ||
+      session.user.role === "employee" ||
+      session.user.role === "manager"
+    )
+      return;
     let alive = true;
     Promise.all([
       api<Employee[]>("/employees"),
@@ -178,9 +210,11 @@ export default function Dashboard() {
       api<Attendance[]>(
         `/attendance?from=${session.today}&to=${session.today}`,
       ),
+      api<{ name: string; managerEmployeeId?: string }[]>("/departments"),
     ])
-      .then(([people, shifts, today]) => {
+      .then(([people, shifts, today, catalog]) => {
         if (alive) {
+          setDepartmentCatalog(catalog);
           setEmployees(people);
           setSchedules(shifts);
           setTodayRecords(today);
@@ -205,7 +239,12 @@ export default function Dashboard() {
     if (from && to) setRecords(await api<Attendance[]>(`/attendance?${query}`));
   }, [from, to, query]);
   useEffect(() => {
-    if (!session || session.user.role === "employee" || view !== "attendance")
+    if (
+      !session ||
+      session.user.role === "employee" ||
+      session.user.role === "manager" ||
+      view !== "attendance"
+    )
       return;
     let alive = true;
     api<Attendance[]>(`/attendance?${query}`)
@@ -226,7 +265,11 @@ export default function Dashboard() {
     };
   }, [query, view, session, handleError]);
   useEffect(() => {
-    if (view === "audit" && session && session.user.role !== "employee")
+    if (
+      view === "audit" &&
+      session &&
+      (session.user.role === "hr" || session.user.role === "admin")
+    )
       api<Audit[]>("/audit").then(setAudit).catch(handleError);
   }, [view, session, handleError]);
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -257,6 +300,7 @@ export default function Dashboard() {
       setSession(null);
       setNavigationOpen(false);
       setEmployees([]);
+      setDepartmentCatalog([]);
       setRecords([]);
       setNotice("");
     } catch (e) {
@@ -274,7 +318,13 @@ export default function Dashboard() {
       await loadCore();
       if (view === "attendance") await loadReport();
       if (view === "audit") setAudit(await api<Audit[]>("/audit"));
-      if (view === "requests") setRequestRevision((v) => v + 1);
+      if (
+        view === "requests" ||
+        view === "payroll" ||
+        view === "reports" ||
+        view === "sales"
+      )
+        setRequestRevision((v) => v + 1);
     } catch (e) {
       handleError(e);
     } finally {
@@ -405,12 +455,62 @@ export default function Dashboard() {
         <footer>Company HR / Administration</footer>
       </main>
     );
+  if (session.user.role === "manager")
+    return (
+      <ManagerWorkspace
+        session={session}
+        logout={logout}
+        onError={handleError}
+        error={error}
+      />
+    );
   if (session.user.role === "employee")
     return (
-      <main className="employee-restricted">
-        <Building2 size={34} />
-        <h1>Employee account</h1>
-        <p>This workspace is available to HR staff and administrators.</p>
+      <main className="employee-requests">
+        <h1>{session.user.name} / Employee workspace</h1>
+        <Notifications
+          key={session.user.id}
+          timezone={session.company.timezone}
+          revision={requestRevision}
+          onError={handleError}
+        />
+        {error && (
+          <p className="message error" role="alert">
+            {error}
+          </p>
+        )}
+        <Requests
+          own
+          today={session.today}
+          employeeId={session.user.employeeId}
+          timezone={session.company.timezone}
+          revision={requestRevision}
+          changed={async () => setRequestRevision((value) => value + 1)}
+          onError={handleError}
+        />
+        <details>
+          <summary>Real estate sales activities</summary>
+          <Sales
+            personal
+            today={session.today}
+            timezone={session.company.timezone}
+            employeeId={session.user.employeeId}
+            revision={requestRevision}
+            onError={handleError}
+          />
+        </details>
+        <details>
+          <summary>Manager reviews</summary>
+          <p>Requests from employees assigned directly to you.</p>
+          <Requests
+            manager
+            employeeId={session.user.employeeId}
+            timezone={session.company.timezone}
+            revision={requestRevision}
+            changed={async () => setRequestRevision((value) => value + 1)}
+            onError={handleError}
+          />
+        </details>
         <button
           className="button secondary"
           onClick={logout}
@@ -427,17 +527,22 @@ export default function Dashboard() {
   const exceptions = todayRecords.filter(
     (r) => r.status === "Missing check-out",
   );
-  const departments = [...new Set(employees.map((e) => e.department))].sort();
+  const departments = [
+    ...new Set([
+      ...departmentCatalog.map((d) => d.name),
+      ...employees.map((e) => e.department),
+    ]),
+  ].sort();
   const filteredEmployees = employees.filter(
     (e) =>
-      `${e.name} ${e.email} ${e.employeeCode} ${e.department}`
+      `${e.name} ${e.email} ${e.employeeNumber} ${e.nationalId} ${e.department}`
         .toLowerCase()
         .includes(search.toLowerCase()) &&
       (employeeState === "all" || e.active === (employeeState === "active")),
   );
   const heading =
     navigation.find((n) => n.id === view)?.label ??
-    (view === "settings" ? "Company settings" : "Your account");
+    (view === "settings" ? "Company settings" : "Settings");
   const navigate = (next: View) => {
     setView(next);
     setNavigationOpen(false);
@@ -493,31 +598,15 @@ export default function Dashboard() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {session.user.role === "admin" && (
-            <button
-              className={`nav-item ${view === "settings" ? "selected" : ""}`}
-              onClick={() => navigate("settings")}
-            >
-              <Settings2 size={18} />
-              Company settings
-            </button>
-          )}
-          <button className="profile" onClick={() => navigate("account")}>
-            <span className="avatar">{initials(session.user.name)}</span>
-            <span>
-              <strong>{session.user.name}</strong>
-              <small>
-                {session.user.role === "admin" ? "Administrator" : "HR staff"}
-              </small>
-            </span>
-          </button>
           <button
-            className="nav-item signout"
-            onClick={logout}
-            disabled={loading}
+            className="profile"
+            onClick={() => navigate("account")}
+            aria-label="Settings"
+            title="Settings"
           >
-            <LogOut size={17} />
-            Sign out
+            <span className="avatar">{initials(session.user.name)}</span>
+            <strong>{session.user.name}</strong>
+            <span className="profile-action">Settings</span>
           </button>
         </div>
       </aside>
@@ -538,6 +627,13 @@ export default function Dashboard() {
             <strong>{heading}</strong>
           </div>
           <div className="topbar-right">
+            <Notifications
+              key={session.user.id}
+              timezone={session.company.timezone}
+              revision={requestRevision}
+              onError={handleError}
+              onOpen={navigate}
+            />
             <span className="topbar-date">
               <CalendarDays size={15} />
               {dateLabel(session.today)}
@@ -548,8 +644,8 @@ export default function Dashboard() {
             </span>
             <button
               className="account-button"
-              title="Your account"
-              aria-label="Your account"
+              title="Settings"
+              aria-label="Settings"
               onClick={() => navigate("account")}
             >
               <span className="avatar small">
@@ -623,12 +719,65 @@ export default function Dashboard() {
               {notice}
             </div>
           )}
+          {view === "manager-reviews" && (
+            <Requests
+              manager
+              employeeId={session.user.employeeId}
+              timezone={session.company.timezone}
+              revision={requestRevision}
+              changed={async () => {
+                setRequestRevision((value) => value + 1);
+                await loadCore();
+              }}
+              onError={handleError}
+            />
+          )}
           {view === "requests" && (
             <Requests
               employeeId={session.user.employeeId}
               timezone={session.company.timezone}
               revision={requestRevision}
-              changed={loadCore}
+              changed={async () => {
+                await loadCore();
+                setRequestRevision((value) => value + 1);
+              }}
+              onError={handleError}
+            />
+          )}
+          {view === "departments" && (
+            <Departments
+              departments={departments}
+              employees={employees}
+              saved={async () => {
+                await loadCore();
+                setRequestRevision((value) => value + 1);
+              }}
+            />
+          )}
+          {view === "reports" && (
+            <Reports
+              today={session.today}
+              company={session.company}
+              preparedBy={session.user.name}
+              departments={departments}
+              revision={requestRevision}
+              onError={handleError}
+            />
+          )}
+          {view === "payroll" && (
+            <Payroll
+              today={session.today}
+              revision={requestRevision}
+              onError={handleError}
+            />
+          )}
+          {view === "sales" && (
+            <Sales
+              key={session.user.id}
+              today={session.today}
+              timezone={session.company.timezone}
+              employeeId={session.user.employeeId}
+              revision={requestRevision}
               onError={handleError}
             />
           )}
@@ -791,6 +940,10 @@ export default function Dashboard() {
                       "Not scheduled",
                       "Approved leave",
                       "Approved holiday",
+                      "Approved sick",
+                      "Approved unpaid",
+                      "Approved urgent",
+                      "Approved mission",
                     ].map((s) => (
                       <option key={s}>{s}</option>
                     ))}
@@ -859,7 +1012,7 @@ export default function Dashboard() {
                             <div>
                               <strong>{e.name}</strong>
                               <span>
-                                {e.employeeCode} / {e.email}
+                                {e.employeeNumber} / {e.nationalId} / {e.email}
                               </span>
                             </div>
                           </div>
@@ -880,7 +1033,8 @@ export default function Dashboard() {
                             onClick={() => setEmployeeEditor(e)}
                             disabled={
                               session.user.role !== "admin" &&
-                              e.role !== "employee"
+                              e.role !== "employee" &&
+                              e.role !== "manager"
                             }
                           >
                             <Pencil size={16} />
@@ -1083,6 +1237,25 @@ export default function Dashboard() {
             <section className="settings-section">
               <h2>{session.user.name}</h2>
               <p className="muted">{session.user.email}</p>
+              {session.user.role === "admin" && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => navigate("settings")}
+                >
+                  <Settings2 size={17} />
+                  Company settings
+                </button>
+              )}
+              <button
+                type="button"
+                className="button secondary"
+                onClick={logout}
+                disabled={loading}
+              >
+                <LogOut size={17} />
+                Sign out
+              </button>
               <h3>Change password</h3>
               <form onSubmit={changePassword}>
                 <PasswordField
@@ -1124,6 +1297,8 @@ export default function Dashboard() {
         <EmployeeEditor
           employee={employeeEditor === "new" ? null : employeeEditor}
           schedules={schedules}
+          departments={departments}
+          employees={employees}
           role={session.user.role}
           today={session.today}
           close={() => setEmployeeEditor(null)}
@@ -1187,9 +1362,7 @@ function AttendancePulse({ rows }: { rows: Attendance[] }) {
     {
       label: "Time off",
       tone: "blue",
-      count: rows.filter(
-        (r) => r.status === "Approved leave" || r.status === "Approved holiday",
-      ).length,
+      count: rows.filter((r) => r.status.startsWith("Approved ")).length,
     },
     {
       label: "No record",
@@ -1287,7 +1460,7 @@ function AttendanceTable({
                   <div>
                     <strong>{r.name}</strong>
                     <span>
-                      {r.department} / {r.employeeCode}
+                      {r.department} / {r.nationalId}
                     </span>
                   </div>
                 </div>
@@ -1298,6 +1471,13 @@ function AttendanceTable({
               <td>{r.hours === null ? "--" : `${r.hours.toFixed(2)} h`}</td>
               <td>
                 <Badge value={r.status} />
+                {locationLabel(r) && (
+                  <div>
+                    {locationLabel(r)}
+                    {r.location?.returnBy &&
+                      ` — return by ${time(r.location.returnBy, r.timezone || timezone)}`}
+                  </div>
+                )}
               </td>
               <td>
                 {

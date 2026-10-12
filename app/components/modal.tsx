@@ -63,6 +63,10 @@ export function Badge({ value }: { value: string }) {
     "approved",
     "Approved leave",
     "Approved holiday",
+    "Approved sick",
+    "Approved unpaid",
+    "Approved urgent",
+    "Approved mission",
   ].includes(value)
     ? "success"
     : ["Late", "Missing check-out", "pending"].includes(value)

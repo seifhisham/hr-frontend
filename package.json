@@ -6,7 +6,8 @@
     "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start --port 3003",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:reports": "node --test test/management-report.test.mjs test/request-pagination.test.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.51.0",

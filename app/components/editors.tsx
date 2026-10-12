@@ -20,6 +20,8 @@ const message = (error: unknown) =>
 export function EmployeeEditor({
   employee,
   schedules,
+  departments,
+  employees,
   role,
   today,
   close,
@@ -27,6 +29,8 @@ export function EmployeeEditor({
 }: {
   employee: Employee | null;
   schedules: Schedule[];
+  departments: string[];
+  employees: Employee[];
   role: Role;
   today: string;
   close: () => void;
@@ -34,21 +38,39 @@ export function EmployeeEditor({
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [scheduleId, setScheduleId] = useState(
+    employee?.scheduleId ?? schedules[0]?.id ?? "",
+  );
+  const [effectiveFrom, setEffectiveFrom] = useState("");
+  const [history, setHistory] = useState<
+    { effectiveFrom: string; schedule: Schedule }[] | null
+  >(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
     const value = {
-      employeeCode: form.get("employeeCode"),
+      nationalId: form.get("nationalId"),
       name: form.get("name"),
       email: form.get("email"),
       department: form.get("department"),
       jobTitle: form.get("jobTitle"),
+      monthlySalary:
+        form.get("monthlySalary") === ""
+          ? null
+          : Number(form.get("monthlySalary")),
+      salaryCurrency: String(form.get("salaryCurrency")).trim().toUpperCase(),
       startDate: form.get("startDate"),
       scheduleId: form.get("scheduleId"),
+      ...(employee && effectiveFrom
+        ? { scheduleEffectiveFrom: effectiveFrom }
+        : {}),
       role: form.get("role") ?? employee?.role ?? "employee",
+      managerId: form.get("managerId") || null,
       active: form.get("active") === "on",
+      salesEnabled: form.get("salesEnabled") === "on",
       ...(form.get("password") ? { password: form.get("password") } : {}),
     };
     try {
@@ -69,6 +91,12 @@ export function EmployeeEditor({
     <Modal title={employee ? "Edit employee" : "Add employee"} close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
+          <Field label="Employee ID">
+            <span>
+              {employee?.employeeNumber ?? "Generated automatically on save"}
+            </span>
+            <small>Assigned automatically and cannot be changed.</small>
+          </Field>
           <Field label="Full name">
             <input
               name="name"
@@ -78,10 +106,12 @@ export function EmployeeEditor({
               autoFocus
             />
           </Field>
-          <Field label="Employee code">
+          <Field label="National ID">
             <input
-              name="employeeCode"
-              defaultValue={employee?.employeeCode}
+              name="nationalId"
+              defaultValue={employee?.nationalId}
+              type="text"
+              autoComplete="off"
               required
               maxLength={120}
             />
@@ -104,25 +134,84 @@ export function EmployeeEditor({
             />
           </Field>
           <Field label="Department">
-            <input
+            <select
               name="department"
-              defaultValue={employee?.department}
+              defaultValue={employee?.department ?? ""}
               required
-              maxLength={120}
-            />
+              disabled={busy}
+            >
+              <option value="" disabled>
+                Select a department
+              </option>
+              {departments.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {!departments.length && (
+              <small>
+                Create a department in the Departments section first.
+              </small>
+            )}
           </Field>
-          <Field label="Employment start date">
+          <Field label="Direct manager">
+            <select name="managerId" defaultValue={employee?.managerId ?? ""}>
+              <option value="">No manager</option>
+              {employees
+                .filter(
+                  (person) =>
+                    person.active &&
+                    person.role !== "employee" &&
+                    person.id !== employee?.id,
+                )
+                .map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name} ({person.employeeNumber})
+                  </option>
+                ))}
+            </select>
+          </Field>
+          <Field label="Date joined">
             <input
               name="startDate"
               type="date"
               defaultValue={employee?.startDate ?? today}
               required
             />
+            <small>Select the day this employee joined the company.</small>
+          </Field>
+          <Field label="Monthly salary">
+            <input
+              name="monthlySalary"
+              type="number"
+              min="0"
+              max="1000000000"
+              step="0.01"
+              defaultValue={employee?.monthlySalary ?? ""}
+              placeholder="Not configured"
+            />
+          </Field>
+          <Field label="Salary currency">
+            <input
+              name="salaryCurrency"
+              defaultValue={employee?.salaryCurrency ?? "EGP"}
+              required
+              pattern="[A-Za-z]{3}"
+              maxLength={3}
+            />
           </Field>
           <Field label="Work schedule">
             <select
               name="scheduleId"
-              defaultValue={employee?.scheduleId ?? schedules[0]?.id}
+              value={scheduleId}
+              onChange={(event) => {
+                setScheduleId(event.target.value);
+                if (employee)
+                  setEffectiveFrom(
+                    employee.startDate > today ? employee.startDate : today,
+                  );
+              }}
               required
             >
               {schedules.map((s) => (
@@ -132,12 +221,35 @@ export function EmployeeEditor({
               ))}
             </select>
           </Field>
-          {role === "admin" && (
+          {employee && (
+            <Field label="Schedule applies from">
+              <input
+                name="scheduleEffectiveFrom"
+                type="date"
+                min={employee.startDate > today ? employee.startDate : today}
+                value={effectiveFrom}
+                onChange={(event) => setEffectiveFrom(event.target.value)}
+                required={scheduleId !== employee.scheduleId}
+              />
+              <small>
+                Leave blank to keep assignments unchanged. Future dates keep the
+                current schedule until that day.
+              </small>
+              <small>
+                Saving an assignment for an existing date replaces that date’s
+                assignment.
+              </small>
+            </Field>
+          )}
+          {(role === "admin" || role === "hr") && (
             <Field label="Access role">
               <select name="role" defaultValue={employee?.role ?? "employee"}>
                 <option value="employee">Employee</option>
-                <option value="hr">HR staff</option>
-                <option value="admin">Administrator</option>
+                <option value="manager">Manager</option>
+                {role === "admin" && <option value="hr">HR staff</option>}
+                {role === "admin" && (
+                  <option value="admin">Administrator</option>
+                )}
               </select>
             </Field>
           )}
@@ -153,6 +265,14 @@ export function EmployeeEditor({
           <label className="check-label">
             <input
               type="checkbox"
+              name="salesEnabled"
+              defaultChecked={employee?.salesEnabled ?? false}
+            />
+            Enable real estate sales activities
+          </label>
+          <label className="check-label">
+            <input
+              type="checkbox"
               name="active"
               defaultChecked={employee?.active ?? true}
             />
@@ -165,6 +285,29 @@ export function EmployeeEditor({
           </p>
         )}
         <footer className="modal-footer">
+          {employee && (
+            <button
+              type="button"
+              className="button secondary"
+              disabled={loadingHistory || busy}
+              onClick={async () => {
+                setLoadingHistory(true);
+                try {
+                  setHistory(
+                    await api<{ effectiveFrom: string; schedule: Schedule }[]>(
+                      `/employees/${employee.id}/schedules`,
+                    ),
+                  );
+                } catch (error) {
+                  setError(message(error));
+                } finally {
+                  setLoadingHistory(false);
+                }
+              }}
+            >
+              {loadingHistory ? "Loading..." : "Schedule assignments"}
+            </button>
+          )}
           <button type="button" className="button secondary" onClick={close}>
             Cancel
           </button>
@@ -174,6 +317,23 @@ export function EmployeeEditor({
           </button>
         </footer>
       </form>
+      {history && (
+        <div className="correction-history">
+          {history.map((assignment) => (
+            <article key={assignment.effectiveFrom}>
+              <strong>{assignment.schedule.name}</strong>
+              <span>
+                Applies from {assignment.effectiveFrom}
+                {assignment.effectiveFrom > today ? " (upcoming)" : ""}
+              </span>
+              <p>
+                {assignment.schedule.start}–{assignment.schedule.end};{" "}
+                {assignment.schedule.days.map((day) => days[day]).join(", ")}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }
@@ -232,6 +392,12 @@ export function ScheduleEditor({
               autoFocus
             />
           </Field>
+          {schedule && (
+            <p className="muted">
+              Changes apply from today in company time. Earlier days and
+              recorded attendance keep their saved schedules.
+            </p>
+          )}
           <Field label="Grace period (minutes)">
             <input
               name="graceMinutes"
@@ -353,7 +519,7 @@ export function CorrectionEditor({
       <div className="record-summary">
         <strong>{record.name}</strong>
         <span>
-          {record.employeeCode} / {record.workDate}
+          {record.nationalId} / {record.workDate}
         </span>
         <span>
           {time(record.checkIn, record.timezone)} -{" "}

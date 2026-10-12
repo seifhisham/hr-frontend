@@ -1,4 +1,4 @@
-export type Role = "employee" | "hr" | "admin";
+export type Role = "employee" | "manager" | "hr" | "admin";
 export type User = {
   id: string;
   name: string;
@@ -18,7 +18,10 @@ export type Schedule = {
 };
 export type Employee = {
   id: string;
-  employeeCode: string;
+  employeeNumber: string;
+  monthlySalary: number | null;
+  salaryCurrency: string;
+  nationalId: string;
   name: string;
   email: string;
   department: string;
@@ -26,12 +29,51 @@ export type Employee = {
   startDate: string;
   scheduleId: string;
   active: boolean;
+  salesEnabled: boolean;
   role: Role;
+  managerId?: string | null;
+};
+export type PayrollRow = {
+  employeeId: string;
+  employeeNumber: string;
+  name: string;
+  department: string;
+  active: boolean;
+  month: string;
+  currency: string;
+  grossSalary: number | null;
+  dailyRate: number | null;
+  deductionDays: number;
+  deductionAmount: number | null;
+  netSalary: number | null;
+  deductions: {
+    requestId: string;
+    status: string;
+    decidedAt: string;
+    days: number;
+  }[];
+  manualDeductions: PayrollDeduction[];
+};
+export type PayrollDeduction = {
+  id: string;
+  employeeId: string;
+  month: string;
+  days: number;
+  reason: string;
+  approvedBy: string;
+  recordedAt: string;
+  recordedBy: string;
+  recordedById: string;
 };
 export type Attendance = {
+  location?: {
+    status: "inside" | "outside" | "unavailable" | "auto-checked-out";
+    returnBy: string | null;
+    autoCheckedOutAt: string | null;
+  } | null;
   id: string | null;
   employeeId: string;
-  employeeCode: string;
+  nationalId: string;
   name: string;
   department: string;
   workDate: string;
@@ -42,6 +84,21 @@ export type Attendance = {
   hours: number | null;
   timezone: string;
 };
+export function locationLabel(record: Attendance) {
+  if (
+    !record.location ||
+    (record.checkOut && record.location.status !== "auto-checked-out")
+  )
+    return "";
+  return {
+    inside: "Inside office boundary",
+    outside: record.location.returnBy
+      ? "Outside office — return window active"
+      : "Outside office — confirming departure",
+    unavailable: "Location service unavailable",
+    "auto-checked-out": "Automatically checked out: outside office",
+  }[record.location.status];
+}
 export type Audit = {
   id: string;
   actor: string;
@@ -57,18 +114,48 @@ export type EmployeeRequest = {
   id: string;
   employeeId: string;
   employeeName: string;
-  employeeCode: string;
-  type: "leave" | "holiday" | "forgotten-check-out";
+  nationalId: string;
+  type:
+    | "leave"
+    | "holiday"
+    | "sick"
+    | "unpaid"
+    | "urgent"
+    | "excuse"
+    | "mission"
+    | "forgotten-check-out";
+  durationMinutes?: number;
+  excuseType?: "leaving-early" | "arriving-late" | "during-shift";
+  shiftId?: string;
+  attachments?: { name: string; mimeType: string; content: string }[];
   from?: string;
   to?: string;
   proposedCheckOut?: string;
   attendance: { checkIn: string; workDate: string; timezone: string } | null;
   reason: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "withdrawn";
+  managerReview?: {
+    status: "approved" | "rejected";
+    employeeId: string;
+    department: string;
+    reviewedBy: string;
+    reviewedAt: string;
+    reason: string;
+  } | null;
+  managerStage?: "not-required" | "pending" | "approved" | "rejected";
+  managerEmployeeId?: string | null;
+  managerDepartment?: string;
+  lastChange?: {
+    action: "withdraw" | "reopen";
+    reason: string;
+    at: string;
+    by: string;
+  };
   submittedAt: string;
   decidedAt: string | null;
   decidedBy: string | null;
   decisionReason: string | null;
+  salaryDeductionDays: number | null;
 };
 
 export class ApiError extends Error {
@@ -116,6 +203,21 @@ export const send = <T>(
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+export async function allRequests(): Promise<EmployeeRequest[]> {
+  const rows: EmployeeRequest[] = [];
+  let before: string | undefined;
+  while (true) {
+    const query = new URLSearchParams({
+      limit: "100",
+      ...(before ? { before } : {}),
+    });
+    const page = await api<EmployeeRequest[]>(`/requests?${query}`);
+    rows.push(...page);
+    if (page.length < 100) return rows;
+    before = page[page.length - 1].id;
+  }
+}
 export function time(value: string | null, timezone: string) {
   return value
     ? new Intl.DateTimeFormat("en", {
@@ -142,3 +244,122 @@ export function initials(value: string) {
     .join("")
     .toUpperCase();
 }
+
+export type NotificationItem = {
+  id: string;
+  type:
+    | "manager-review-required"
+    | "manager-reviewed"
+    | "request-decided"
+    | "request-reopened"
+    | "pending-request"
+    | "missing-check-out";
+  title: string;
+  message: string;
+  createdAt: string;
+  readAt: string | null;
+  requestId?: string;
+  attendanceId?: string;
+};
+export type NotificationInbox = {
+  items: NotificationItem[];
+  unreadCount: number;
+};
+
+export type PayrollRun = {
+  month: string;
+  status: "draft" | "approved";
+  company: string;
+  timezone: string;
+  revision: string;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  approvedById: string | null;
+  approvalReason: string | null;
+  rows: PayrollRow[];
+};
+
+export type SalesAccess = {
+  canSubmit: boolean;
+  canReview: boolean;
+  canSetTargets: boolean;
+};
+export type SalesActivityInput =
+  | {
+      kind: "meeting" | "viewing";
+      activityDate: string;
+      clientName: string;
+      projectName: string;
+      propertyReference: string;
+      notes: string;
+      purpose: string;
+      outcome: string;
+      followUpDate: string | null;
+    }
+  | {
+      kind: "closed-deal";
+      activityDate: string;
+      clientName: string;
+      projectName: string;
+      propertyReference: string;
+      notes: string;
+      dealReference: string;
+      transactionType: "sale" | "lease";
+      value: number;
+      currency: string;
+    };
+export type SalesActivity = SalesActivityInput & {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  department: string;
+  submittedAt: string;
+  updatedAt: string;
+  revision: number;
+  status: "pending" | "verified" | "returned";
+  canReview: boolean;
+  review: {
+    status: "verified" | "returned";
+    reason: string;
+    by: string;
+    byId: string;
+    at: string;
+  } | null;
+};
+export type SalesTarget = {
+  employeeId: string;
+  month: string;
+  meetings: number;
+  deals: number;
+  transactionValue: number | null;
+  currency: string | null;
+  revision: number;
+  reason: string;
+  updatedAt: string;
+  updatedBy: string;
+};
+export type SalesPerformance = {
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  department: string;
+  active: boolean;
+  salesEnabled: boolean;
+  month: string;
+  meetings: number;
+  viewings: number;
+  meetingTotal: number;
+  deals: number;
+  sales: number;
+  leases: number;
+  transactionValues: Record<string, number>;
+  pending: number;
+  returned: number;
+  target: SalesTarget | null;
+  achievement: {
+    meetings: number | null;
+    deals: number | null;
+    transactionValue: number | null;
+  };
+};

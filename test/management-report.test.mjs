@@ -159,7 +159,7 @@ test("HTML and CSV have one employee row, escape content and contain no corrupte
   });
   const html = managementHtml(report),
     csv = managementCsv(report);
-  assert.equal((html.match(/<tbody><tr>/g) || []).length, 1);
+  assert.equal((html.match(/<tbody><tr>/g) || []).length, 2);
   assert.ok(html.includes("<td>--</td>"));
   assert.ok(html.includes("&lt;script&gt;"));
   assert.ok(!html.includes("<script>"));
@@ -169,4 +169,42 @@ test("HTML and CSV have one employee row, escape content and contain no corrupte
     assert.ok(!output.includes("Â"));
     assert.ok(!output.includes("Job title"));
   }
+});
+
+test("HTML summary respects department scope and distinguishes missing records from absence", () => {
+  const html = managementHtml(base({
+    department: "Sales",
+    employees: [employee(), employee("two"), employee("other", "Operations")],
+    rows: [
+      attendance({ late: true, hours: 7.5, status: "present" }),
+      attendance({ employeeId: "other", late: true }),
+      attendance({ workDate: "2026-10-05", late: true }),
+    ],
+    requests: [request()],
+  }));
+  assert.ok(html.includes('<strong>2</strong><span>Employees in scope'));
+  assert.ok(html.includes('<strong>1</strong><span>Recorded check-ins'));
+  assert.ok(html.includes('<strong>1</strong><span>Late records'));
+  assert.ok(html.includes('<strong>1</strong><span>Deduction days'));
+  assert.ok(html.includes('1 checked-in record(s) have no recorded check-out'));
+  assert.ok(html.includes('1 employee(s) have no recorded check-in'));
+  assert.ok(html.includes('missing records do not establish absence'));
+  assert.ok(html.includes('<td>7.5</td>'));
+  assert.ok(!html.includes('Operations'));
+  assert.ok(!html.includes('2026-10-04T08:00:00Z'));
+});
+
+test("HTML handles an empty report and separates weekly entries safely", () => {
+  const empty = managementHtml(base({ employees: [] }));
+  assert.ok(empty.includes('No employees for this period.'));
+  assert.ok(empty.includes('No attendance records for this period.'));
+  const html = managementHtml(base({
+    period: "weekly", to: "2026-10-05",
+    rows: [attendance(), attendance({ workDate: "2026-10-05" })],
+    preparedBy: '<img src=x onerror=alert(1)>',
+  }));
+  assert.ok(html.includes('2026-10-04: 10:00<br>2026-10-05: 10:00'));
+  assert.ok(html.includes('&lt;img'));
+  assert.ok(!html.includes('<img'));
+  assert.ok(html.includes('thead{display:table-header-group}'));
 });

@@ -18,6 +18,7 @@ export type Schedule = {
 };
 export type Employee = {
   id: string;
+  accountId?: string | null;
   employeeNumber: string;
   monthlySalary: number | null;
   salaryCurrency: string;
@@ -101,6 +102,7 @@ export function locationLabel(record: Attendance) {
 }
 export type Audit = {
   id: string;
+  actorId: string;
   actor: string;
   action: string;
   recordId: string;

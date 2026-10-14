@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
-import { Download, Plus, RefreshCw } from "lucide-react";
+import { Download, Plus, RefreshCw, TrendingUp, ClipboardList, ShieldCheck } from "lucide-react";
 import {
   api,
   send,
@@ -20,8 +20,17 @@ const names = {
 };
 const money = (value: number, currency: string) =>
   `${currency} ${value.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const progress = (actual: number, goal?: number, percentage?: number | null) =>
-  goal ? `${actual} / ${goal} (${percentage ?? 0}%)` : `${actual} — no target`;
+const progress = (actual: number, goal?: number, percentage?: number | null) => (
+  <div className="sales-progress">
+    <strong>{actual} <span>{goal ? `/ ${goal}` : ""}</span></strong>
+    {goal ? (
+      <>
+        <meter min={0} max={goal} value={actual} aria-label={`${actual} of ${goal} target achieved`} />
+        <small>{percentage ?? 0}% of monthly target</small>
+      </>
+    ) : <small>No monthly target set</small>}
+  </div>
+);
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to save sales activity";
 
@@ -603,20 +612,21 @@ export function Sales({
     }
   }
   return (
-    <section className="section">
-      <div className="section-heading">
+    <section className="section sales-page">
+      <div className="sales-filter-panel">
+      <div className="section-heading sales-intro">
         <div>
-          <h2>Real estate sales</h2>
+          <h2><TrendingUp size={22} aria-hidden="true" /> Sales overview</h2>
           <span className="muted">
             Meetings, property viewings and signed sale / lease contracts
           </span>
         </div>
       </div>
-      <p>
-        Only verified activities count toward targets. Contract value is not
-        commission or company revenue; currencies remain separate.
-      </p>
-      <div className="report-controls">
+      <div className="sales-guidance">
+        <ShieldCheck size={18} aria-hidden="true" />
+        <p>Only verified activities count toward targets. Contract values are shown per currency and represent signed contracts, not revenue or commission.</p>
+      </div>
+      <div className="report-controls sales-main-controls">
         <Field label="Month">
           <input
             type="month"
@@ -680,9 +690,9 @@ export function Sales({
             </Field>
           </>
         )}
-        <button className="button secondary" onClick={refresh}>
-          <RefreshCw size={16} />
-          Refresh
+        <button className="button secondary" disabled={validMonth && !current && failure?.key !== key} onClick={refresh}>
+          <RefreshCw size={16} aria-hidden="true" />
+          {validMonth && !current && failure?.key !== key ? "Loading…" : "Refresh"}
         </button>
         {own && current?.access.canSubmit && (
           <button className="button primary" onClick={() => setActivity("new")}>
@@ -700,6 +710,7 @@ export function Sales({
             {exporting ? "Exporting..." : "Export performance CSV"}
           </button>
         )}
+      </div>
       </div>
       {!validMonth ? (
         <p className="error" role="alert">
@@ -719,7 +730,10 @@ export function Sales({
               in your employee profile. Existing history remains available.
             </p>
           )}
-          <h3>Monthly performance</h3>
+          <div className="sales-section-heading">
+            <div><h3>Monthly performance</h3><p>Verified results compared with each employee’s monthly targets.</p></div>
+            <span className="sales-count">{performance.length} employees</span>
+          </div>
           <div className="table-wrap">
             <table className="sales-table">
               <thead>
@@ -736,8 +750,7 @@ export function Sales({
                 {performance.map((row) => (
                   <tr key={row.employeeId}>
                     <td>
-                      {row.employeeName}
-                      <br />
+                      <strong className="sales-person-name">{row.employeeName}</strong>
                       <small>
                         {row.employeeNumber} / {row.department}
                       </small>
@@ -748,7 +761,6 @@ export function Sales({
                         row.target?.meetings,
                         row.achievement.meetings,
                       )}
-                      <br />
                       <small>
                         {row.meetings} meetings / {row.viewings} viewings
                       </small>
@@ -759,7 +771,6 @@ export function Sales({
                         row.target?.deals,
                         row.achievement.deals,
                       )}
-                      <br />
                       <small>
                         {row.sales} sales / {row.leases} leases
                       </small>
@@ -784,7 +795,10 @@ export function Sales({
                       )}
                     </td>
                     <td>
-                      {row.pending} pending / {row.returned} returned
+                      <div className="sales-verification-counts">
+                        <span className="sales-status pending">{row.pending} pending</span>
+                        <span className="sales-status returned">{row.returned} returned</span>
+                      </div>
                     </td>
                     <td>
                       {current.access.canSetTargets &&
@@ -794,7 +808,7 @@ export function Sales({
                             className="button secondary"
                             onClick={() => setTarget(row)}
                           >
-                            Set targets
+                            {row.target ? "Edit targets" : "Set targets"}
                           </button>
                         )}
                       {row.target && (
@@ -816,8 +830,12 @@ export function Sales({
               sales access in Employees.
             </p>
           )}
-          <div className="report-controls">
-            <h3>Activity history</h3>
+          <div className="sales-history-panel">
+          <div className="sales-section-heading">
+            <div><h3><ClipboardList size={19} aria-hidden="true" /> Activity history</h3><p>Review submissions, verification feedback, and follow-up details.</p></div>
+            <span className="sales-count">{activities.length} activities</span>
+          </div>
+          <div className="report-controls sales-history-controls">
             <Field label="Activity type">
               <select
                 aria-label="Activity type"
@@ -840,10 +858,12 @@ export function Sales({
               >
                 <option value="">All statuses</option>
                 {["pending", "verified", "returned"].map((value) => (
-                  <option key={value}>{value}</option>
+                  <option key={value} value={value}>{value === "returned" ? "Needs correction" : value === "pending" ? "Awaiting verification" : "Verified"}</option>
                 ))}
               </select>
             </Field>
+          </div>
+          <p className="sales-filter-note">These filters apply to activity history only. Monthly performance includes all verified activity types.</p>
           </div>
           <div className="table-wrap">
             <table className="sales-table">
@@ -904,7 +924,7 @@ export function Sales({
                       )}
                     </td>
                     <td>
-                      <strong>{row.status}</strong>
+                      <span className={`sales-status ${row.status}`}>{row.status === "returned" ? "Needs correction" : row.status === "pending" ? "Awaiting verification" : "Verified"}</span>
                       {row.review && (
                         <p>
                           {row.review.status === "returned" &&

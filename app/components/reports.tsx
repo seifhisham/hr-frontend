@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Download, Printer, RefreshCw } from "lucide-react";
+import { Download, Printer, RefreshCw, FileText, CalendarDays, Building2 } from "lucide-react";
 import {
   api,
   allRequests,
@@ -150,10 +150,14 @@ export function Reports({
   }
   return (
     <section className="section">
-      <p>
-        Create a daily or weekly attendance report for management. Weekly
-        periods run Sunday-Saturday; the current week ends at today.
-      </p>
+      <div className="report-filter-panel">
+        <div className="report-panel-intro">
+          <span className="report-panel-icon"><FileText size={20} aria-hidden="true" /></span>
+          <div>
+            <h2>Build your attendance report</h2>
+            <p>Choose a period and department. Weekly reports run Sunday–Saturday, up to today.</p>
+          </div>
+        </div>
       <div className="report-controls">
         <Field label="Report period">
           <select
@@ -193,9 +197,10 @@ export function Reports({
           disabled={loading || !!validation}
           onClick={() => setVersion((v) => v + 1)}
         >
-          <RefreshCw size={16} />
-          Refresh report
+          <RefreshCw size={16} aria-hidden="true" />
+          {loading ? "Generating report…" : "Refresh report"}
         </button>
+      </div>
       </div>
       {validation && (
         <p className="message error" role="alert">
@@ -210,12 +215,12 @@ export function Reports({
       )}
       {report && (
         <>
+          <div className="report-summary-panel">
           <div className="section-heading report-heading">
-            <div>
-              <h2>
-                {company.name} | {period === "daily" ? "Daily" : "Weekly"}{" "}
-                report
-              </h2>
+            <div className="report-title">
+              <span className="report-period-badge">{period === "daily" ? "Daily" : "Weekly"} attendance</span>
+              <h2>{company.name} report</h2>
+              <span className="muted">{lines.length} {lines.length === 1 ? "employee" : "employees"} in this report</span>
             </div>
             <div className="report-actions">
               <button
@@ -229,7 +234,7 @@ export function Reports({
                 }
               >
                 <Download size={16} />
-                Download CSV
+                Export CSV
               </button>
               <button
                 className="button secondary"
@@ -242,7 +247,7 @@ export function Reports({
                 }
               >
                 <Download size={16} />
-                Download report
+                Download HTML
               </button>
               <button className="button primary" onClick={print}>
                 <Printer size={16} />
@@ -250,18 +255,21 @@ export function Reports({
               </button>
             </div>
           </div>
-          <p>
-            {dateLabel(report.from)} to {dateLabel(report.to)} |{" "}
-            {report.department || "All departments"}
-            <br />
-            Prepared by {report.preparedBy} | Generated{" "}
-            {new Intl.DateTimeFormat("en", {
+          <div className="report-context">
+            <span><CalendarDays size={16} aria-hidden="true" />
+              {report.from === report.to ? dateLabel(report.from) : `${dateLabel(report.from)} – ${dateLabel(report.to)}`}
+            </span>
+            <span><Building2 size={16} aria-hidden="true" />{report.department || "All departments"}</span>
+          </div>
+          <div className="report-prepared">
+            <span>Prepared by <strong>{report.preparedBy}</strong></span>
+            <span>Generated {new Intl.DateTimeFormat("en", {
               timeZone: report.timezone,
               dateStyle: "medium",
               timeStyle: "short",
-            }).format(new Date(report.generatedAt))}{" "}
-            ({report.timezone})
-          </p>
+            }).format(new Date(report.generatedAt))} ({report.timezone})</span>
+          </div>
+          </div>
           <div className="table-wrap">
             <table className="employee-report-table">
               <thead>

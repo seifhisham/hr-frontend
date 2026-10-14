@@ -38,7 +38,6 @@ import {
   send,
   time,
   type Attendance,
-  type Audit,
   type Company,
   type Employee,
   type Schedule,
@@ -54,6 +53,7 @@ import { Reports } from "./reports";
 import { Departments } from "./departments";
 import { Notifications } from "./notifications";
 import { Sales } from "./sales";
+import { ActivityLog } from "./activity-log";
 import { ManagerWorkspace } from "./manager-workspace";
 
 type View =
@@ -134,7 +134,6 @@ export default function Dashboard() {
   const [records, setRecords] = useState<Attendance[]>([]);
   const [loadedQuery, setLoadedQuery] = useState("");
   const [todayRecords, setTodayRecords] = useState<Attendance[]>([]);
-  const [audit, setAudit] = useState<Audit[]>([]);
   const [requestRevision, setRequestRevision] = useState(0);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -264,14 +263,6 @@ export default function Dashboard() {
       alive = false;
     };
   }, [query, view, session, handleError]);
-  useEffect(() => {
-    if (
-      view === "audit" &&
-      session &&
-      (session.user.role === "hr" || session.user.role === "admin")
-    )
-      api<Audit[]>("/audit").then(setAudit).catch(handleError);
-  }, [view, session, handleError]);
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -317,7 +308,7 @@ export default function Dashboard() {
       setSession(s);
       await loadCore();
       if (view === "attendance") await loadReport();
-      if (view === "audit") setAudit(await api<Audit[]>("/audit"));
+      if (view === "audit") setRequestRevision((value) => value + 1);
       if (
         view === "requests" ||
         view === "payroll" ||
@@ -535,7 +526,7 @@ export default function Dashboard() {
   ].sort();
   const filteredEmployees = employees.filter(
     (e) =>
-      `${e.name} ${e.email} ${e.employeeNumber} ${e.nationalId} ${e.department}`
+      `${e.name} ${e.email} ${e.employeeNumber} ${e.nationalId} ${e.department} ${e.accountId ?? ""}`
         .toLowerCase()
         .includes(search.toLowerCase()) &&
       (employeeState === "all" || e.active === (employeeState === "active")),
@@ -968,28 +959,42 @@ export default function Dashboard() {
           )}
           {view === "employees" && (
             <>
-              <div className="employee-toolbar">
-                <label className="search">
-                  <Search size={17} />
-                  <input
-                    aria-label="Search employees"
-                    placeholder="Search employees"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </label>
-                <select
-                  aria-label="Employee status"
-                  value={employeeState}
-                  onChange={(e) => setEmployeeState(e.target.value)}
-                >
-                  <option value="all">All employees</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-                <span className="muted">
-                  {filteredEmployees.length} employees
-                </span>
+              <div className="employee-directory-panel">
+                <div className="employee-directory-heading">
+                  <div>
+                    <h2>Employee directory</h2>
+                    <p>Find employees by name, email, employee number, national ID, or department.</p>
+                  </div>
+                  <span className="employee-result-count" role="status">
+                    <strong>{filteredEmployees.length}</strong> of {employees.length} employees
+                  </span>
+                </div>
+                <div className="employee-toolbar">
+                  <div className="field employee-search-field">
+                    <span>Search directory</span>
+                    <label className="search">
+                      <Search size={17} aria-hidden="true" />
+                      <input
+                        type="search"
+                        aria-label="Search employees"
+                        placeholder="Search by name, email, ID, or department"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <label className="field employee-status-field">
+                    Employee status
+                    <select
+                      value={employeeState}
+                      onChange={(e) => setEmployeeState(e.target.value)}
+                    >
+                      <option value="all">All employees</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </label>
+                </div>
               </div>
               <div className="table-wrap">
                 <table>
@@ -1013,6 +1018,9 @@ export default function Dashboard() {
                               <strong>{e.name}</strong>
                               <span>
                                 {e.employeeNumber} / {e.nationalId} / {e.email}
+                              </span>
+                              <span className="employee-account-id">
+                                Account UUID: <code>{e.accountId ?? "No linked account"}</code>
                               </span>
                             </div>
                           </div>
@@ -1111,87 +1119,7 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-          {view === "audit" && (
-            <section className="section">
-              <div className="section-heading">
-                <h2>Recent activity</h2>
-                <span className="muted">Latest 100 changes</span>
-              </div>
-              {audit.length ? (
-                <div className="activity-list">
-                  {audit.map((a) => (
-                    <article key={a.id}>
-                      <span className="activity-icon">
-                        <History size={17} />
-                      </span>
-                      <div>
-                        <strong>
-                          {a.action.replaceAll(".", " ").replaceAll("_", " ")}
-                        </strong>
-                        <p>
-                          {a.actor}
-                          {typeof a.after?.name === "string"
-                            ? ` / ${a.after.name}`
-                            : ""}
-                        </p>
-                        {a.reason && <p>{a.reason}</p>}
-                        {a.action === "attendance.corrected" && (
-                          <div className="audit-times">
-                            Check-in:{" "}
-                            {time(
-                              typeof a.before?.checkIn === "string"
-                                ? a.before.checkIn
-                                : null,
-                              String(
-                                a.before?.timezone ?? session.company.timezone,
-                              ),
-                            )}{" "}
-                            to{" "}
-                            {time(
-                              typeof a.after?.checkIn === "string"
-                                ? a.after.checkIn
-                                : null,
-                              String(
-                                a.after?.timezone ?? session.company.timezone,
-                              ),
-                            )}
-                            <br />
-                            Check-out:{" "}
-                            {time(
-                              typeof a.before?.checkOut === "string"
-                                ? a.before.checkOut
-                                : null,
-                              String(
-                                a.before?.timezone ?? session.company.timezone,
-                              ),
-                            )}{" "}
-                            to{" "}
-                            {time(
-                              typeof a.after?.checkOut === "string"
-                                ? a.after.checkOut
-                                : null,
-                              String(
-                                a.after?.timezone ?? session.company.timezone,
-                              ),
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <time>
-                        {new Date(a.at).toLocaleString("en", {
-                          timeZone: session.company.timezone,
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
-                      </time>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <Empty icon={History} title="No changes recorded yet" />
-              )}
-            </section>
-          )}
+          {view === "audit" && <ActivityLog timezone={session.company.timezone} revision={requestRevision} onError={handleError} />}
           {view === "settings" && (
             <section className="settings-section">
               <h2>Company details</h2>

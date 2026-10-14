@@ -1,6 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Building2 } from "lucide-react";
 import { send, type Employee } from "../../lib/api";
 import { Field } from "./modal";
 
@@ -39,20 +39,24 @@ export function Departments({
   }
   return (
     <section className="section">
-      <p>
-        Create departments now and assign or move employees later by editing
-        their Department in the Employees section.
-      </p>
-      <p>Assign each employee a direct manager in the Employees section.</p>
-      <form onSubmit={create} className="report-controls">
+      <div className="department-create-panel">
+        <div className="department-create-heading">
+          <span className="department-create-icon"><Building2 size={20} aria-hidden="true" /></span>
+          <div>
+            <h2>Create a department</h2>
+            <p>Organize your team, then assign employees and direct managers in Employees.</p>
+          </div>
+        </div>
+      <form onSubmit={create} className="department-create-form">
         <Field label="Department name">
-          <input name="name" required maxLength={120} disabled={busy} />
+          <input name="name" placeholder="e.g. Sales or Engineering" required maxLength={120} disabled={busy} />
         </Field>
         <button className="button primary" disabled={busy}>
-          <Plus size={16} />
+          <Plus size={16} aria-hidden="true" />
           {busy ? "Creating..." : "Create department"}
         </button>
       </form>
+      </div>
       {error && (
         <p className="message error" role="alert">
           {error}
@@ -63,7 +67,11 @@ export function Departments({
           {notice}
         </p>
       )}
-      <div className="table-wrap">
+      <div className="department-list-heading">
+        <h2>Departments</h2>
+        <span>{departments.length} total</span>
+      </div>
+      <div className="table-wrap department-table">
         <table>
           <thead>
             <tr>
@@ -75,7 +83,7 @@ export function Departments({
           <tbody>
             {departments.map((name) => (
               <tr key={name}>
-                <td>{name}</td>
+                <td><strong>{name}</strong></td>
                 <td>{employees.filter((e) => e.department === name).length}</td>
                 <td>
                   {

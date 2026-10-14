@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import { ClipboardList, Check, X } from "lucide-react";
+import { ClipboardList, Check, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   api,
   send,
@@ -125,14 +125,14 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
     }
   }
   return (
-    <form onSubmit={submit}>
-      <h2>Add request</h2>
-      {
-        <p>
-          Approval deducts 1 salary day. Rejection deducts 3 salary days. This
-          applies once per request.
-        </p>
-      }
+    <form onSubmit={submit} className="personal-request-form">
+      <div className="personal-request-heading">
+        <span><ClipboardList size={21} aria-hidden="true" /></span>
+        <div><h2>New request</h2><p>Choose a request type, dates, and provide the details for review.</p></div>
+      </div>
+      <p className="personal-request-policy">
+        Approval deducts 1 salary day. Rejection deducts 3 salary days. This applies once per request.
+      </p>
       <fieldset disabled={busy} className="form-grid">
         <Field label="Request type">
           <select value={type} onChange={(e) => setType(e.target.value)}>
@@ -153,7 +153,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
         </Field>
         {type === "excuse" && (
           <>
-            <p>
+            <p className="personal-request-allowance">
               Monthly allowance: 4 hours (240 minutes), across at most 3 Excuse
               requests. Pending and approved requests count; rejected or
               withdrawn requests release the allowance. Duration is counted for
@@ -189,6 +189,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
             </Field>
           </>
         )}
+        <div className="personal-request-full">
         <Field label="Description">
           <textarea
             name="reason"
@@ -198,6 +199,8 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
             rows={3}
           />
         </Field>
+        </div>
+        <div className="personal-request-full">
         <Field label="Attachments (up to 3, 512 KB each)">
           <input
             name="attachments"
@@ -206,6 +209,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
             multiple
           />
         </Field>
+        </div>
       </fieldset>
       {error && (
         <p className="message error" role="alert">
@@ -217,12 +221,14 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
           {notice}
         </p>
       )}
+      <div className="personal-request-actions">
       <button
         className="button primary"
         disabled={busy || (type === "excuse" && !shift)}
       >
         {busy ? "Submitting..." : "Submit request"}
       </button>
+      </div>
     </form>
   );
 }
@@ -247,9 +253,10 @@ export function Requests({
   today?: string;
 }) {
   const [status, setStatus] = useState("pending");
+  const [pageSize, setPageSize] = useState(50);
   const [review, setReview] = useState<EmployeeRequest | null>(null);
   const [version, setVersion] = useState(0);
-  const listKey = JSON.stringify([revision, version, own, manager, status]);
+  const listKey = JSON.stringify([revision, version, own, manager, status, pageSize]);
   const [pagination, setPagination] = useState<{
     key: string;
     cursors: string[];
@@ -272,7 +279,7 @@ export function Requests({
         ? "/requests/me"
         : "/requests";
     const query = new URLSearchParams({
-      limit: "50",
+      limit: String(pageSize),
       ...(status ? { status } : {}),
       ...(before ? { before } : {}),
     });
@@ -289,61 +296,91 @@ export function Requests({
     return () => {
       alive = false;
     };
-  }, [pageKey, before, status, onError, own, manager]);
+  }, [pageKey, before, status, onError, own, manager, pageSize]);
   const filtered = rows;
   return (
-    <section className="section">
+    <section className={`section ${own ? "personal-requests-page" : ""}`}>
       {own && (
         <RequestForm today={today!} saved={() => setVersion((v) => v + 1)} />
       )}
       {own && (
-        <p>
-          Salary deductions on this page:{" "}
-          {rows.reduce((total, r) => total + (r.salaryDeductionDays ?? 0), 0)}{" "}
-          days
-        </p>
+        <div className="personal-request-history-heading">
+          <div><h2>Request history</h2><p>Track decisions and open a request to view details or withdraw it.</p></div>
+          <span className="personal-request-deductions">
+            Salary deductions on this page: <strong>{rows.reduce((total, r) => total + (r.salaryDeductionDays ?? 0), 0)} days</strong>
+          </span>
+        </div>
       )}
       <div className="request-filters">
-        <Field label="Status">
-          <select
-            aria-label="Request status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
+        <div className="request-status-group" role="group" aria-label="Request status">
+          {[
+            ["", "All requests"],
+            ["pending", "Pending"],
+            ["approved", "Approved"],
+            ["rejected", "Rejected"],
+            ["withdrawn", "Withdrawn"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="request-status-button"
+              aria-pressed={status === value}
+              onClick={() => setStatus(value)}
+            >
+              {value && <span className={`request-status-dot ${value}`} aria-hidden="true" />}
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="request-list-controls">
+          <span className="request-result-count" role="status">
+            {loaded
+              ? result.error
+                ? "Unable to load requests"
+                : `${rows.length} ${rows.length === 1 ? "request" : "requests"} on this page`
+              : "Loading requests…"}
+          </span>
+          <label className="request-page-size">
+            Per page
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!loaded}
+            onClick={() => setVersion((v) => v + 1)}
           >
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="withdrawn">Withdrawn</option>
-            <option value="">All requests</option>
-          </select>
-        </Field>
-        <span>{filtered.length} requests on this page</span>
-        <button type="button" onClick={() => setVersion((v) => v + 1)}>
-          Refresh
-        </button>
-        <button
-          type="button"
-          disabled={!cursors.length}
-          onClick={() =>
-            setPagination({ key: listKey, cursors: cursors.slice(0, -1) })
-          }
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          disabled={!loaded || rows.length < 50}
-          onClick={() =>
-            setPagination({
-              key: listKey,
-              cursors: [...cursors, rows[rows.length - 1].id],
-            })
-          }
-        >
-          Next
-        </button>
+            <RefreshCw size={16} aria-hidden="true" />
+            Refresh
+          </button>
+          <nav className="request-pagination" aria-label="Request pages">
+            <button
+              type="button"
+              className="button secondary"
+              disabled={!loaded || !cursors.length}
+              onClick={() => setPagination({ key: listKey, cursors: cursors.slice(0, -1) })}
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+              Previous
+            </button>
+            <span className="request-page-number">Page {cursors.length + 1}</span>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={!loaded || rows.length < pageSize}
+              onClick={() => setPagination({ key: listKey, cursors: [...cursors, rows[rows.length - 1].id] })}
+            >
+              Next
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </nav>
+        </div>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap" aria-busy={!loaded}>
         <table>
           <thead>
             <tr>
@@ -401,7 +438,7 @@ export function Requests({
             {loaded
               ? result.error
                 ? "Unable to load requests. Refresh to retry."
-                : "No requests"
+                : status ? `No ${status} requests` : "No requests yet"
               : "Loading requests"}
           </strong>
         </div>

@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, Plus, RefreshCw, TrendingUp, ClipboardList, ShieldCheck } from "lucide-react";
 import {
   api,
-  send,
+  save,
   ApiError,
   dateLabel,
   type SalesActivity,
@@ -88,7 +88,7 @@ function ActivityForm({
     setError("");
     try {
       if (record) {
-        await send(`/sales/activities/${record.id}`, "PATCH", {
+        await save(`/sales/activities/${record.id}`, "PATCH", {
           expectedRevision: record.revision,
           activity,
         });
@@ -103,7 +103,7 @@ function ActivityForm({
             "A previous submission has an uncertain outcome. Close this form and refresh your history before changing or resubmitting it.",
           );
         submission.current ??= { id: crypto.randomUUID(), activity };
-        await send("/sales/activities", "POST", submission.current);
+        await save("/sales/activities", "POST", submission.current);
       }
       saved();
       close();
@@ -317,7 +317,7 @@ function TargetForm({
     setBusy(true);
     setError("");
     try {
-      await send("/sales/targets", "POST", {
+      await save("/sales/targets", "POST", {
         employeeId: row.employeeId,
         month: row.month,
         meetings: Number(form.get("meetings")),
@@ -438,7 +438,7 @@ function ReviewForm({
     setBusy(true);
     setError("");
     try {
-      await send(`/sales/activities/${record.id}/review`, "PATCH", {
+      await save(`/sales/activities/${record.id}/review`, "PATCH", {
         status,
         reason,
         expectedRevision: record.revision,

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Check, Save } from "lucide-react";
 import {
   api,
-  send,
+  save,
   time,
   type Audit,
   type Attendance,
@@ -74,7 +74,7 @@ export function EmployeeEditor({
       ...(form.get("password") ? { password: form.get("password") } : {}),
     };
     try {
-      await send(
+      await save(
         employee ? `/employees/${employee.id}` : "/employees",
         employee ? "PATCH" : "POST",
         value,
@@ -357,7 +357,7 @@ export function ScheduleEditor({
     setError("");
     const data = new FormData(event.currentTarget);
     try {
-      await send(
+      await save(
         schedule ? `/schedules/${schedule.id}` : "/schedules",
         schedule ? "PATCH" : "POST",
         {
@@ -489,7 +489,7 @@ export function CorrectionEditor({
     setError("");
     const data = new FormData(event.currentTarget);
     try {
-      await send(
+      await save(
         record.id ? `/attendance/${record.id}` : "/attendance",
         record.id ? "PATCH" : "POST",
         {

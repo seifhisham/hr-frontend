@@ -1933,3 +1933,57 @@ tbody tr:hover {
 .audit-readable-fields > p { color: var(--muted); font-size: 12px; padding: 8px 0; }
 
 .employee-account-id code { user-select: all; font-size: 11px; color: #61547e; }
+
+
+.company-address-search { margin: 8px 0 18px; }
+.company-address-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+.company-address-search > .muted { margin-bottom: 12px; }
+.company-address-bar { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.company-address-bar:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px #ece9f5; }
+.company-address-bar > svg { flex-shrink: 0; color: var(--muted); }
+.company-address-bar input { flex: 1; border: 0; padding: 8px 0; background: transparent; }
+.company-address-bar input:focus { outline: none; }
+.company-address-bar input::-webkit-search-cancel-button { display: none; }
+.company-address-clear { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border: 0; border-radius: 8px; color: var(--muted); background: transparent; }
+.company-address-clear:hover { background: #f0ecfa; }
+.company-address-submit { flex-shrink: 0; min-height: 42px; }
+.company-search-status { font-size: 13px; line-height: 1.6; color: var(--green); overflow-wrap: anywhere; }
+.company-search-status:not(:empty) { margin-top: 10px; }
+.company-address-results { list-style: none; margin: 10px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 8px 24px #31204b0a; max-height: 280px; overflow-y: auto; }
+.company-address-results li + li { border-top: 1px solid var(--line); }
+.company-address-results button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 62px; padding: 12px; text-align: left; border: 0; border-radius: 8px; background: transparent; color: var(--foreground); }
+.company-address-results button:hover { background: #f7f5fc; }
+.company-result-pin { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; color: var(--green); background: #f0ecfa; }
+.company-result-address { flex: 1; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.company-address-results button > svg { flex-shrink: 0; color: var(--muted); }
+.company-search-provider { display: block; margin-top: 9px; font-size: 11px; color: var(--muted); }
+.company-map-help { line-height: 1.6; }
+.company-map-keyboard { margin: 6px 0 12px; font-size: 12px; color: var(--muted); }
+.company-map-keyboard summary { cursor: pointer; }
+.company-map-keyboard p { margin-top: 6px; }
+@media (max-width: 480px) {
+  .company-address-bar { gap: 6px; padding-left: 10px; flex-wrap: wrap; }
+  .company-address-bar input { width: calc(100% - 70px); }
+  .company-address-submit { width: 100%; justify-content: center; }
+}
+
+.company-map-legend { display: flex; flex-wrap: wrap; gap: 10px 20px; list-style: none; padding: 0; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+.company-map-legend li { display: flex; align-items: center; gap: 8px; }
+.company-map-swatch { display: inline-block; width: 22px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+.company-map-manual { border: 2px solid #50358c; background: #50358c1f; }
+.company-map-warning { border: 2px dashed #b45309; background: #f59e0b14; }
+
+.company-map-container { position: relative; z-index: 0; }
+.company-map-locate { position: absolute; top: 12px; right: 12px; z-index: 1; min-height: 44px; max-width: calc(100% - 72px); background: white; box-shadow: 0 2px 8px #31204b26; }
+.company-location-feedback:not(:empty) { margin: 0 0 12px; line-height: 1.6; }
+
+.settings-save-toast { margin: 0; left: auto; bottom: auto; position: fixed; top: 24px; right: 24px; z-index: 2000; display: flex; align-items: flex-start; gap: 12px; width: min(420px, calc(100vw - 32px)); padding: 18px; border: 1px solid #bbdfcb; border-left: 4px solid #278454; border-radius: 14px; background: #f3fcf6; color: #205d3d; box-shadow: 0 10px 35px #1c163326; }
+.settings-save-toast > svg { flex-shrink: 0; margin-top: 2px; }
+.settings-save-toast > div { flex: 1; min-width: 0; }
+.settings-save-toast strong { font-size: 14px; }
+.settings-save-toast p { margin-top: 5px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.settings-save-toast > button { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; color: inherit; background: transparent; }
+.settings-save-toast > button:hover { background: #0000000a; }
+.settings-save-toast.error { color: #912d32; background: #fff5f5; border-color: #edc3c5; border-left-color: #c4444b; }
+.settings-save-toast.warning { color: #865414; background: #fffbef; border-color: #eed9a7; border-left-color: #b7791f; }
+@media (max-width: 480px) { .settings-save-toast { top: 16px; right: 16px; } }

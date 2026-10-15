@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   ApiError,
   api,
-  send,
+  save,
   type PayrollRow,
   type PayrollRun,
 } from "../../lib/api";
@@ -263,7 +263,7 @@ function ApprovalEditor({
     setBusy(true);
     setError("");
     try {
-      await send("/payroll/approve", "POST", {
+      await save("/payroll/approve", "POST", {
         month: run.month,
         expectedRevision: run.revision,
         reason,
@@ -350,7 +350,7 @@ function DeductionEditor({
     setBusy(true);
     setError("");
     try {
-      await send("/payroll/deductions", "POST", {
+      await save("/payroll/deductions", "POST", {
         employeeId: employee.employeeId,
         month: employee.month,
         days: Number(form.get("days")),

@@ -1,7 +1,8 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { Plus, Building2 } from "lucide-react";
-import { send, type Employee } from "../../lib/api";
+import { save, type Employee } from "../../lib/api";
+import { notifySave } from "../../lib/save-toast";
 import { Field } from "./modal";
 
 export function Departments({
@@ -15,21 +16,17 @@ export function Departments({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       const name = String(new FormData(form).get("name")).trim();
       if (!name) throw new Error("Enter a department name.");
-      await send("/departments", "POST", { name });
+      await save("/departments", "POST", { name });
       form.reset();
-      setNotice(
-        `Department ${name} created. Assign employees from the Employees section.`,
-      );
+      notifySave({ tone: "success", message: `Department ${name} created. Assign employees from the Employees section.` });
       await saved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to create department");
@@ -60,11 +57,6 @@ export function Departments({
       {error && (
         <p className="message error" role="alert">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p className="message notice" role="status">
-          {notice}
         </p>
       )}
       <div className="department-list-heading">

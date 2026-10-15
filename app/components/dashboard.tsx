@@ -36,6 +36,7 @@ import {
   initials,
   locationLabel,
   send,
+  save,
   time,
   type Attendance,
   type Company,
@@ -43,6 +44,7 @@ import {
   type Schedule,
   type Session,
 } from "../../lib/api";
+import { notifySave } from "../../lib/save-toast";
 import { Badge, Field } from "./modal";
 import { PasswordField } from "./password-field";
 import Link from "next/link";
@@ -54,6 +56,7 @@ import { Departments } from "./departments";
 import { Notifications } from "./notifications";
 import { Sales } from "./sales";
 import { ActivityLog } from "./activity-log";
+import { CompanyLocation } from "./company-location";
 import { ManagerWorkspace } from "./manager-workspace";
 
 type View =
@@ -93,7 +96,6 @@ export default function Dashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [view, setView] = useState<View>("overview");
   const [navigationOpen, setNavigationOpen] = useState(false);
   useEffect(() => {
@@ -293,7 +295,6 @@ export default function Dashboard() {
       setEmployees([]);
       setDepartmentCatalog([]);
       setRecords([]);
-      setNotice("");
     } catch (e) {
       handleError(e);
     } finally {
@@ -348,19 +349,31 @@ export default function Dashboard() {
   async function saveCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    notifySave(null);
     setError("");
     const data = new FormData(event.currentTarget);
+    let saved = false;
     try {
-      await send<Company>("/settings", "PATCH", {
+      const company = await send<Company>("/settings", "PATCH", {
         name: data.get("name"),
         timezone: data.get("timezone"),
+        latitude: Number(data.get("latitude")),
+        longitude: Number(data.get("longitude")),
+        radiusMeters: Number(data.get("radiusMeters")),
+        trackingRadiusMeters: Number(data.get("trackingRadiusMeters")),
+        trackingGraceMinutes: Number(data.get("trackingGraceMinutes")),
       });
+      saved = true;
+      setSession((current) => current ? { ...current, company } : current);
       const next = await api<Session>("/auth/me");
       setSession(next);
       setFrom(next.today);
       setTo(next.today);
-      setNotice("Company settings saved.");
+      notifySave({ tone: "success", message: "Company settings saved successfully." });
     } catch (e) {
+      notifySave(saved
+        ? { tone: "warning", message: "Settings saved, but the workspace could not refresh. Reload the page." }
+        : { tone: "error", message: `Could not confirm the save: ${errorMessage(e)} Please try again.` });
       handleError(e);
     } finally {
       setLoading(false);
@@ -377,12 +390,12 @@ export default function Dashboard() {
       return;
     }
     try {
-      await send("/auth/password", "POST", {
+      await save("/auth/password", "POST", {
         currentPassword: data.get("currentPassword"),
         newPassword: data.get("newPassword"),
       });
       setSession(null);
-      setNotice("Password changed. Sign in with your new password.");
+      notifySave({ tone: "success", message: "Password changed. Sign in with your new password." });
     } catch (e) {
       handleError(e);
     } finally {
@@ -430,11 +443,6 @@ export default function Dashboard() {
             {error && (
               <p className="error" role="alert">
                 {error}
-              </p>
-            )}
-            {notice && (
-              <p className="notice" role="status">
-                {notice}
               </p>
             )}
             <button className="button primary wide" disabled={loading}>
@@ -538,7 +546,6 @@ export default function Dashboard() {
     setView(next);
     setNavigationOpen(false);
     setError("");
-    setNotice("");
   };
   return (
     <div className={`workspace ${navigationOpen ? "navigation-open" : ""}`}>
@@ -703,11 +710,6 @@ export default function Dashboard() {
               >
                 <X size={16} />
               </button>
-            </div>
-          )}
-          {notice && (
-            <div className="message notice" role="status">
-              {notice}
             </div>
           )}
           {view === "manager-reviews" && (
@@ -1125,7 +1127,7 @@ export default function Dashboard() {
               <h2>Company details</h2>
               <form
                 onSubmit={saveCompany}
-                key={session.company.name + session.company.timezone}
+                key={JSON.stringify(session.company)}
               >
                 <Field label="Company name">
                   <input
@@ -1154,9 +1156,14 @@ export default function Dashboard() {
                     ))}
                   </datalist>
                 </Field>
-                <button className="button primary" disabled={loading}>
-                  <CheckCircle2 size={17} />
-                  Save settings
+                <CompanyLocation company={session.company} />
+                <Field label="Time to return (minutes)">
+                  <input name="trackingGraceMinutes" type="number" min={1} max={1440} step={1} required defaultValue={session.company.trackingGraceMinutes} />
+                  <small>Automatic checkout occurs if the employee stays reliably outside until this time expires. Existing warning deadlines remain unchanged when settings are saved.</small>
+                </Field>
+                <button className="button primary" disabled={loading} aria-busy={loading}>
+                  <CheckCircle2 size={17} aria-hidden="true" />
+                  {loading ? "Saving..." : "Save settings"}
                 </button>
               </form>
             </section>

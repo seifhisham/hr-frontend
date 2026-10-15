@@ -3,12 +3,13 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ClipboardList, Check, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   api,
-  send,
+  save,
   dateLabel,
   time,
   type EmployeeRequest,
   type Schedule,
 } from "../../lib/api";
+import { notifySave } from "../../lib/save-toast";
 import { Badge, Field, Modal } from "./modal";
 
 const names = {
@@ -45,7 +46,6 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
   const [shift, setShift] = useState<Schedule | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   useEffect(() => {
     let alive = true;
     Promise.all([
@@ -72,7 +72,6 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
     const form = new FormData(element);
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       const files = form
         .getAll("attachments")
@@ -101,7 +100,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
           }),
         })),
       );
-      await send("/requests", "POST", {
+      await save("/requests", "POST", {
         type,
         from: form.get("from"),
         to: form.get("to"),
@@ -116,7 +115,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
           : {}),
       });
       element.reset();
-      setNotice("Request submitted for HR review.");
+      notifySave({ tone: "success", message: "Request submitted for HR review." });
       saved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to submit request");
@@ -214,11 +213,6 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
       {error && (
         <p className="message error" role="alert">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p className="message notice" role="status">
-          {notice}
         </p>
       )}
       <div className="personal-request-actions">
@@ -516,7 +510,7 @@ function RequestReview({
     setError("");
     try {
       const action = button.value;
-      await send(
+      await save(
         `/requests/${request.id}/${action === "withdraw" || action === "reopen" ? action : canManagerReview ? "manager-review" : "decision"}`,
         "PATCH",
         {

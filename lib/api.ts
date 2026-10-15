@@ -1,3 +1,5 @@
+import { notifySave } from "./save-toast";
+
 export type Role = "employee" | "manager" | "hr" | "admin";
 export type User = {
   id: string;
@@ -6,7 +8,7 @@ export type User = {
   role: Role;
   employeeId: string | null;
 };
-export type Company = { name: string; timezone: string };
+export type Company = { name: string; timezone: string; latitude: number; longitude: number; radiusMeters: number; trackingRadiusMeters: number; trackingGraceMinutes: number };
 export type Session = { user: User; company: Company; today: string };
 export type Schedule = {
   id: string;
@@ -205,6 +207,18 @@ export const send = <T>(
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+export async function save<T>(path: string, method: "POST" | "PATCH", body?: unknown): Promise<T> {
+  notifySave(null);
+  try {
+    const result = await send<T>(path, method, body);
+    notifySave({ tone: "success", message: "Changes saved successfully." });
+    return result;
+  } catch (error) {
+    notifySave({ tone: "error", message: `Could not confirm the save: ${error instanceof Error ? error.message : "Please try again."}` });
+    throw error;
+  }
+}
 
 export async function allRequests(): Promise<EmployeeRequest[]> {
   const rows: EmployeeRequest[] = [];

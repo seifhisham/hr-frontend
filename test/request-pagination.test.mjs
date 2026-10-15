@@ -18,6 +18,7 @@ test("reports follow request cursors and include every page", async () => {
   const calls = [];
   const context = {
     exports: {},
+    require: () => ({ notifySave() {} }),
     URLSearchParams,
     fetch: async (path) => {
       calls.push(path);
@@ -47,6 +48,7 @@ test("reports fail instead of returning partial totals when a page fails", async
   let calls = 0;
   const context = {
     exports: {},
+    require: () => ({ notifySave() {} }),
     URLSearchParams,
     fetch: async () =>
       ++calls === 1

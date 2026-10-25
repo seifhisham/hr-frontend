@@ -20,10 +20,12 @@ const money = (value: number | null, currency: string) =>
       }).format(value);
 
 export function Payroll({
+  canApprove = false,
   today,
   revision,
   onError,
 }: {
+  canApprove?: boolean;
   today: string;
   revision: number;
   onError: (error: unknown) => void;
@@ -92,7 +94,7 @@ export function Payroll({
         {run && (
           <Badge value={run.status === "approved" ? "approved" : "draft"} />
         )}
-        {run?.status === "draft" && (
+        {canApprove && run?.status === "draft" && (
           <button
             className="button primary"
             disabled={
@@ -108,13 +110,16 @@ export function Payroll({
       </div>
       {run?.status === "approved" && (
         <p className="message notice">
-          Locked payroll approved by {run.approvedBy} on{" "}
+          {canApprove
+            ? `Locked payroll approved by ${run.approvedBy}`
+            : "Approved payroll for your permitted branch scope"}{" "}
+          on{" "}
           {new Intl.DateTimeFormat("en", {
             timeZone: run.timezone,
             dateStyle: "medium",
             timeStyle: "short",
           }).format(new Date(run.approvedAt!))}
-          . Reason: {run.approvalReason}. These saved salaries and deductions
+          . {run.approvalReason ? `Reason: ${run.approvalReason}. ` : ""}These saved salaries and deductions
           will not change when employee records are edited.
         </p>
       )}

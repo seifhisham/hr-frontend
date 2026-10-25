@@ -2,14 +2,41 @@ import { notifySave } from "./save-toast";
 
 export type Role = "employee" | "manager" | "hr" | "admin";
 export type User = {
+  companyId: string;
   id: string;
   name: string;
   email: string;
   role: Role;
   employeeId: string | null;
 };
-export type Company = { name: string; timezone: string; latitude: number; longitude: number; radiusMeters: number; trackingRadiusMeters: number; trackingGraceMinutes: number };
-export type Session = { user: User; company: Company; today: string };
+export type Company = {
+  name: string;
+  timezone: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  trackingRadiusMeters: number;
+  trackingGraceMinutes: number;
+};
+export type Session = {
+  user: User;
+  company: Company;
+  today: string;
+  workspace?: string;
+  hrBranchIds?: string[];
+};
+export type Branch = {
+  id: string;
+  code: string;
+  name: string;
+  address?: string;
+  active: boolean;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  trackingRadiusMeters: number;
+  trackingGraceMinutes: number;
+};
 export type Schedule = {
   id: string;
   name: string;
@@ -19,6 +46,7 @@ export type Schedule = {
   graceMinutes: number;
 };
 export type Employee = {
+  branchId?: string;
   id: string;
   accountId?: string | null;
   employeeNumber: string;
@@ -69,6 +97,9 @@ export type PayrollDeduction = {
   recordedById: string;
 };
 export type Attendance = {
+  employeeNumber?: string;
+  branchId?: string;
+  branchName?: string;
   location?: {
     status: "inside" | "outside" | "unavailable" | "auto-checked-out";
     returnBy: string | null;
@@ -208,14 +239,21 @@ export const send = <T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-export async function save<T>(path: string, method: "POST" | "PATCH", body?: unknown): Promise<T> {
+export async function save<T>(
+  path: string,
+  method: "POST" | "PATCH",
+  body?: unknown,
+): Promise<T> {
   notifySave(null);
   try {
     const result = await send<T>(path, method, body);
     notifySave({ tone: "success", message: "Changes saved successfully." });
     return result;
   } catch (error) {
-    notifySave({ tone: "error", message: `Could not confirm the save: ${error instanceof Error ? error.message : "Please try again."}` });
+    notifySave({
+      tone: "error",
+      message: `Could not confirm the save: ${error instanceof Error ? error.message : "Please try again."}`,
+    });
     throw error;
   }
 }

@@ -39,6 +39,7 @@ import {
   save,
   time,
   type Attendance,
+  type Branch,
   type Company,
   type Employee,
   type Schedule,
@@ -56,6 +57,7 @@ import { Departments } from "./departments";
 import { Notifications } from "./notifications";
 import { Sales } from "./sales";
 import { ActivityLog } from "./activity-log";
+import { Branches } from "./branches";
 import { CompanyLocation } from "./company-location";
 import { ManagerWorkspace } from "./manager-workspace";
 
@@ -71,6 +73,7 @@ type View =
   | "reports"
   | "payroll"
   | "sales"
+  | "branches"
   | "settings"
   | "account";
 const navigation: { id: View; label: string; icon: LucideIcon }[] = [
@@ -83,6 +86,7 @@ const navigation: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "sales", label: "Sales performance", icon: Building2 },
   { id: "departments", label: "Departments", icon: Building2 },
   { id: "employees", label: "Employees", icon: Users },
+  { id: "branches", label: "Branches & access", icon: Building2 },
   { id: "schedules", label: "Work schedules", icon: CalendarDays },
   { id: "audit", label: "Activity log", icon: History },
 ];
@@ -131,6 +135,8 @@ export default function Dashboard() {
   const [departmentCatalog, setDepartmentCatalog] = useState<
     { name: string; managerEmployeeId?: string }[]
   >([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchId, setBranchId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [records, setRecords] = useState<Attendance[]>([]);
@@ -153,7 +159,17 @@ export default function Dashboard() {
   );
   const [correction, setCorrection] = useState<Attendance | null>(null);
   const handleError = useCallback((e: unknown) => {
-    if (e instanceof ApiError && e.status === 401) setSession(null);
+    if (e instanceof ApiError && [401, 403, 503].includes(e.status)) {
+      setSession(null);
+      setEmployees([]);
+      setRecords([]);
+      setTodayRecords([]);
+      setBranches([]);
+      setSchedules([]);
+      setEmployeeEditor(null);
+      setCorrection(null);
+      setScheduleEditor(null);
+    }
     setError(errorMessage(e));
   }, []);
   useEffect(() => {
@@ -181,18 +197,21 @@ export default function Dashboard() {
     if (
       !session ||
       session.user.role === "employee" ||
-      session.user.role === "manager"
+      session.user.role === "manager" ||
+      (session.user.role === "hr" && !session.hrBranchIds?.length)
     )
       return;
-    const [people, shifts, today, catalog] = await Promise.all([
+    const [people, shifts, today, catalog, branchList] = await Promise.all([
       api<Employee[]>("/employees"),
       api<Schedule[]>("/schedules"),
       api<Attendance[]>(
         `/attendance?from=${session.today}&to=${session.today}`,
       ),
       api<{ name: string; managerEmployeeId?: string }[]>("/departments"),
+      api<Branch[]>("/branches"),
     ]);
     setDepartmentCatalog(catalog);
+    setBranches(branchList);
     setEmployees(people);
     setSchedules(shifts);
     setTodayRecords(today);
@@ -212,10 +231,12 @@ export default function Dashboard() {
         `/attendance?from=${session.today}&to=${session.today}`,
       ),
       api<{ name: string; managerEmployeeId?: string }[]>("/departments"),
+      api<Branch[]>("/branches"),
     ])
-      .then(([people, shifts, today, catalog]) => {
+      .then(([people, shifts, today, catalog, branchList]) => {
         if (alive) {
           setDepartmentCatalog(catalog);
+          setBranches(branchList);
           setEmployees(people);
           setSchedules(shifts);
           setTodayRecords(today);
@@ -234,6 +255,7 @@ export default function Dashboard() {
     ...(department ? { department } : {}),
     ...(status ? { status } : {}),
     ...(employeeId ? { employeeId } : {}),
+    ...(branchId ? { branchId } : {}),
   }).toString();
   const reportLoading = loadedQuery !== query;
   const loadReport = useCallback(async () => {
@@ -244,6 +266,7 @@ export default function Dashboard() {
       !session ||
       session.user.role === "employee" ||
       session.user.role === "manager" ||
+      (session.user.role === "hr" && !session.hrBranchIds?.length) ||
       view !== "attendance"
     )
       return;
@@ -272,6 +295,7 @@ export default function Dashboard() {
     const data = new FormData(event.currentTarget);
     try {
       await send("/auth/login", "POST", {
+        workspace: data.get("workspace"),
         email: data.get("email"),
         password: data.get("password"),
       });
@@ -298,6 +322,18 @@ export default function Dashboard() {
     } catch (e) {
       handleError(e);
     } finally {
+      setSession(null);
+      setNavigationOpen(false);
+      setDepartmentCatalog([]);
+      setEmployees([]);
+      setRecords([]);
+      setTodayRecords([]);
+      setBranches([]);
+      setSchedules([]);
+      setEmployeeEditor(null);
+      setCorrection(null);
+      setScheduleEditor(null);
+      setBranchId("");
       setLoading(false);
     }
   }
@@ -357,23 +393,39 @@ export default function Dashboard() {
       const company = await send<Company>("/settings", "PATCH", {
         name: data.get("name"),
         timezone: data.get("timezone"),
-        latitude: Number(data.get("latitude")),
-        longitude: Number(data.get("longitude")),
-        radiusMeters: Number(data.get("radiusMeters")),
-        trackingRadiusMeters: Number(data.get("trackingRadiusMeters")),
-        trackingGraceMinutes: Number(data.get("trackingGraceMinutes")),
+        ...(data.has("latitude")
+          ? {
+              latitude: Number(data.get("latitude")),
+              longitude: Number(data.get("longitude")),
+              radiusMeters: Number(data.get("radiusMeters")),
+              trackingRadiusMeters: Number(data.get("trackingRadiusMeters")),
+              trackingGraceMinutes: Number(data.get("trackingGraceMinutes")),
+            }
+          : {}),
       });
       saved = true;
-      setSession((current) => current ? { ...current, company } : current);
+      setSession((current) => (current ? { ...current, company } : current));
       const next = await api<Session>("/auth/me");
       setSession(next);
       setFrom(next.today);
       setTo(next.today);
-      notifySave({ tone: "success", message: "Company settings saved successfully." });
+      notifySave({
+        tone: "success",
+        message: "Company settings saved successfully.",
+      });
     } catch (e) {
-      notifySave(saved
-        ? { tone: "warning", message: "Settings saved, but the workspace could not refresh. Reload the page." }
-        : { tone: "error", message: `Could not confirm the save: ${errorMessage(e)} Please try again.` });
+      notifySave(
+        saved
+          ? {
+              tone: "warning",
+              message:
+                "Settings saved, but the workspace could not refresh. Reload the page.",
+            }
+          : {
+              tone: "error",
+              message: `Could not confirm the save: ${errorMessage(e)} Please try again.`,
+            },
+      );
       handleError(e);
     } finally {
       setLoading(false);
@@ -395,7 +447,10 @@ export default function Dashboard() {
         newPassword: data.get("newPassword"),
       });
       setSession(null);
-      notifySave({ tone: "success", message: "Password changed. Sign in with your new password." });
+      notifySave({
+        tone: "success",
+        message: "Password changed. Sign in with your new password.",
+      });
     } catch (e) {
       handleError(e);
     } finally {
@@ -425,13 +480,25 @@ export default function Dashboard() {
           <h1>Welcome back</h1>
           <p className="muted">Sign in to your HR workspace.</p>
           <form onSubmit={login}>
+            <Field label="Company code">
+              <input
+                name="workspace"
+                required
+                minLength={2}
+                maxLength={63}
+                pattern="[a-z0-9][a-z0-9-]{1,62}"
+                autoComplete="organization"
+                autoCapitalize="none"
+                spellCheck={false}
+                autoFocus
+              />
+            </Field>
             <Field label="Email">
               <input
                 name="email"
                 type="email"
                 required
                 autoComplete="username"
-                autoFocus
               />
             </Field>
             <PasswordField
@@ -463,7 +530,10 @@ export default function Dashboard() {
         error={error}
       />
     );
-  if (session.user.role === "employee")
+  if (
+    session.user.role === "employee" ||
+    (session.user.role === "hr" && !session.hrBranchIds?.length)
+  )
     return (
       <main className="employee-requests">
         <h1>{session.user.name} / Employee workspace</h1>
@@ -759,6 +829,7 @@ export default function Dashboard() {
           )}
           {view === "payroll" && (
             <Payroll
+              canApprove={session.user.role === "admin"}
               today={session.today}
               revision={requestRevision}
               onError={handleError}
@@ -879,6 +950,19 @@ export default function Dashboard() {
           {view === "attendance" && (
             <>
               <div className="filters">
+                <Field label="Branch">
+                  <select
+                    value={branchId}
+                    onChange={(event) => setBranchId(event.target.value)}
+                  >
+                    <option value="">All permitted branches</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
                 <Field label="From">
                   <input
                     type="date"
@@ -965,10 +1049,14 @@ export default function Dashboard() {
                 <div className="employee-directory-heading">
                   <div>
                     <h2>Employee directory</h2>
-                    <p>Find employees by name, email, employee number, national ID, or department.</p>
+                    <p>
+                      Find employees by name, email, employee number, national
+                      ID, or department.
+                    </p>
                   </div>
                   <span className="employee-result-count" role="status">
-                    <strong>{filteredEmployees.length}</strong> of {employees.length} employees
+                    <strong>{filteredEmployees.length}</strong> of{" "}
+                    {employees.length} employees
                   </span>
                 </div>
                 <div className="employee-toolbar">
@@ -1022,7 +1110,10 @@ export default function Dashboard() {
                                 {e.employeeNumber} / {e.nationalId} / {e.email}
                               </span>
                               <span className="employee-account-id">
-                                Account UUID: <code>{e.accountId ?? "No linked account"}</code>
+                                Account UUID:{" "}
+                                <code>
+                                  {e.accountId ?? "No linked account"}
+                                </code>
                               </span>
                             </div>
                           </div>
@@ -1121,7 +1212,24 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-          {view === "audit" && <ActivityLog timezone={session.company.timezone} revision={requestRevision} onError={handleError} />}
+          {view === "audit" && (
+            <ActivityLog
+              timezone={session.company.timezone}
+              revision={requestRevision}
+              onError={handleError}
+            />
+          )}
+          {view === "branches" && (
+            <Branches
+              branches={branches}
+              employees={employees}
+              company={session.company}
+              today={session.today}
+              role={session.user.role}
+              refresh={loadCore}
+              onError={handleError}
+            />
+          )}
           {view === "settings" && (
             <section className="settings-section">
               <h2>Company details</h2>
@@ -1156,12 +1264,36 @@ export default function Dashboard() {
                     ))}
                   </datalist>
                 </Field>
-                <CompanyLocation company={session.company} />
-                <Field label="Time to return (minutes)">
-                  <input name="trackingGraceMinutes" type="number" min={1} max={1440} step={1} required defaultValue={session.company.trackingGraceMinutes} />
-                  <small>Automatic checkout occurs if the employee stays reliably outside until this time expires. Existing warning deadlines remain unchanged when settings are saved.</small>
-                </Field>
-                <button className="button primary" disabled={loading} aria-busy={loading}>
+                {branches.filter((branch) => branch.active).length === 1 && (
+                  <>
+                    <CompanyLocation company={session.company} />
+                    <Field label="Time to return (minutes)">
+                      <input
+                        name="trackingGraceMinutes"
+                        type="number"
+                        min={1}
+                        max={1440}
+                        step={1}
+                        required
+                        defaultValue={session.company.trackingGraceMinutes}
+                      />
+                      <small>
+                        Automatic checkout occurs if the employee stays reliably
+                        outside until this time expires. Existing warning
+                        deadlines remain unchanged when settings are saved.
+                      </small>
+                    </Field>
+                  </>
+                )}
+                <p className="muted">
+                  Manage individual office locations and attendance policies
+                  under Branches & access.
+                </p>
+                <button
+                  className="button primary"
+                  disabled={loading}
+                  aria-busy={loading}
+                >
                   <CheckCircle2 size={17} aria-hidden="true" />
                   {loading ? "Saving..." : "Save settings"}
                 </button>
@@ -1232,6 +1364,7 @@ export default function Dashboard() {
         <EmployeeEditor
           employee={employeeEditor === "new" ? null : employeeEditor}
           schedules={schedules}
+          branches={branches}
           departments={departments}
           employees={employees}
           role={session.user.role}

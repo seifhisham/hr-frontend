@@ -7,12 +7,13 @@
     "build": "next build",
     "start": "next start --port 3003",
     "lint": "eslint",
-    "test:reports": "node --test test/management-report.test.mjs test/request-pagination.test.mjs"
+    "test:reports": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
     "lucide-react": "^1.51.0",
     "next": "16.3.8",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

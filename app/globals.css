@@ -835,6 +835,94 @@ tbody tr:hover {
 .settings-section > .button {
   margin: 18px 8px 0 0;
 }
+.branches-page {
+  display: grid;
+  gap: 24px;
+}
+.branches-page .section-heading {
+  margin-bottom: 0;
+}
+.branches-page > .muted {
+  margin-top: -12px;
+  line-height: 1.6;
+}
+.branches-page .settings-section {
+  max-width: none;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+.branches-page .settings-section h3,
+.branches-page .settings-section > p,
+.branches-page .settings-section form {
+  margin: 0;
+}
+.branches-page .settings-section > p {
+  max-width: 72ch;
+  line-height: 1.6;
+}
+.branches-page fieldset,
+.branch-editor fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 16px;
+}
+.branches-page legend,
+.branch-editor legend {
+  padding: 0 0 16px;
+  font-weight: 600;
+}
+.branches-page fieldset > .button,
+.branch-editor fieldset > .button {
+  justify-self: start;
+}
+.branch-check,
+.branch-check > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.5;
+}
+.branch-check {
+  min-height: 40px;
+  font-size: 13px;
+}
+.branch-check input {
+  flex-shrink: 0;
+  margin: 0;
+}
+.branches-page ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+.branch-editor {
+  padding: 24px;
+}
+.branch-editor fieldset > div {
+  display: grid;
+  gap: 16px;
+}
+.branch-editor .company-map-help,
+.branch-editor .company-map-keyboard,
+.branch-editor .company-map-legend,
+.branch-editor .company-location-feedback {
+  margin: 0;
+}
+.branch-editor .company-location-feedback:empty {
+  display: none;
+}
+.branch-editor .error {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .branches-page { gap: 20px; }
+  .branches-page .settings-section,
+  .branch-editor { padding: 18px; }
+}
 .workspace-footer {
   display: flex;
   justify-content: space-between;
@@ -1139,6 +1227,39 @@ tbody tr:hover {
   color: #99a3a7;
   font-size: 11px;
 }
+.owner-card { margin: 32px 0; }
+.owner-card > p, .owner-card > button, .owner-card > a { margin-top: 18px; }
+.owner-secret { padding: 16px; border: 1px solid var(--line); border-radius: 12px; overflow-wrap: anywhere; white-space: pre-wrap; user-select: all; }
+.owner-dashboard { max-width: 1500px; margin: auto; padding: 32px 24px; }
+.owner-heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 20px; margin-bottom: 24px; }
+.owner-heading p { margin-top: 8px; }
+.owner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.button.owner-action-create { background: var(--sidebar); color: #fff; border-color: var(--sidebar); }
+.button.owner-action-create:hover:not(:disabled) { background: #363044; }
+.button.owner-action-account,
+.button.owner-action-refresh,
+.button.owner-action-signout,
+.button.owner-action-active { background: #fff; color: var(--foreground); border-color: var(--line); }
+.button.owner-action-account:hover:not(:disabled),
+.button.owner-action-refresh:hover:not(:disabled),
+.button.owner-action-signout:hover:not(:disabled),
+.button.owner-action-active:hover:not(:disabled) { background: #f5f5f7; border-color: #c9cbd2; }
+.button.owner-action-suspended,
+.button.owner-action-revoke-invitation { background: #fff; color: #795b2c; border-color: #d6c5a7; }
+.button.owner-action-suspended:hover:not(:disabled),
+.button.owner-action-revoke-invitation:hover:not(:disabled) { background: #f8f5ef; border-color: #b59b70; }
+.button.owner-action-archived { background: #fff; color: #a33c35; border-color: #e0c3bf; }
+.button.owner-action-archived:hover:not(:disabled) { background: #faf2f1; border-color: #c68e88; }
+.owner-section { padding: 24px; margin-top: 24px; border: 1px solid var(--line); border-radius: 20px; background: white; }
+.owner-section > p { margin: 12px 0; }
+.owner-modal-body { display: grid; gap: 20px; padding: 24px; }
+.owner-modal-body > p { line-height: 1.6; }
+.owner-modal-body > .button { justify-self: start; }
+.modal .owner-modal-body .form-grid { padding: 0; }
+.modal .owner-modal-body .error { margin: 0; }
+@media(max-width:600px) { .owner-modal-body { padding: 18px; gap: 16px; } }
+.owner-page .login-brand { flex-wrap: wrap; justify-content: center; }
+@media(max-width:600px) { .owner-dashboard { padding: 20px 12px; } .owner-section { padding: 16px; } .owner-card { padding: 24px; } }
 .spinning {
   animation: spin 1s linear infinite;
 }

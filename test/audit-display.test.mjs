@@ -9,6 +9,9 @@ test("audit actions and field names become readable labels", () => {
   assert.equal(context.exports.auditLabel("sales.target.saved"), "Sales target saved");
   assert.equal(context.exports.auditLabel("request.approved"), "Request approved");
   assert.equal(context.exports.auditLabel("salaryDeductionDays"), "Salary deduction days");
+  assert.equal(context.exports.auditLabel("owner.signed_in"), "Owner signed in");
+  assert.equal(context.exports.auditLabel("owner.credentials_enrolled"), "Owner credentials enrolled");
+  assert.equal(context.exports.auditLabel("owner.bootstrap_started"), "Owner bootstrap started");
 });
 test("audit snapshots keep nested values, lists, false, zero, and missing values", () => {
   const fields = context.exports.auditFields({ active: false, days: 0, schedule: { name: "Morning" }, items: ["One", "Two"], reason: null });

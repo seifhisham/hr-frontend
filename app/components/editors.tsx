@@ -7,6 +7,7 @@ import {
   time,
   type Audit,
   type Attendance,
+  type Branch,
   type Employee,
   type Role,
   type Schedule,
@@ -20,6 +21,7 @@ const message = (error: unknown) =>
 export function EmployeeEditor({
   employee,
   schedules,
+  branches = [],
   departments,
   employees,
   role,
@@ -29,6 +31,7 @@ export function EmployeeEditor({
 }: {
   employee: Employee | null;
   schedules: Schedule[];
+  branches?: Branch[];
   departments: string[];
   employees: Employee[];
   role: Role;
@@ -64,6 +67,7 @@ export function EmployeeEditor({
       salaryCurrency: String(form.get("salaryCurrency")).trim().toUpperCase(),
       startDate: form.get("startDate"),
       scheduleId: form.get("scheduleId"),
+      branchId: employee?.branchId || form.get("branchId"),
       ...(employee && effectiveFrom
         ? { scheduleEffectiveFrom: effectiveFrom }
         : {}),
@@ -91,6 +95,36 @@ export function EmployeeEditor({
     <Modal title={employee ? "Edit employee" : "Add employee"} close={close}>
       <form onSubmit={submit}>
         <div className="form-grid">
+          <Field label="Assigned branch">
+            <select
+              name="branchId"
+              required
+              disabled={!!employee}
+              defaultValue={
+                employee?.branchId ??
+                branches.find((branch) => branch.active)?.id ??
+                ""
+              }
+            >
+              <option value="" disabled>
+                Select a branch
+              </option>
+              {branches
+                .filter(
+                  (branch) => branch.active || branch.id === employee?.branchId,
+                )
+                .map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+            </select>
+            {employee && (
+              <small>
+                Use Branches & access for an effective-dated transfer.
+              </small>
+            )}
+          </Field>
           <Field label="Employee ID">
             <span>
               {employee?.employeeNumber ?? "Generated automatically on save"}
@@ -158,6 +192,14 @@ export function EmployeeEditor({
           <Field label="Direct manager">
             <select name="managerId" defaultValue={employee?.managerId ?? ""}>
               <option value="">No manager</option>
+              {employee?.managerId &&
+                !employees.some(
+                  (person) => person.id === employee.managerId,
+                ) && (
+                  <option value={employee.managerId}>
+                    Assigned manager (another branch)
+                  </option>
+                )}
               {employees
                 .filter(
                   (person) =>

@@ -9,7 +9,11 @@ import { api, type Company } from "../../lib/api";
 
 type SearchResult = { latitude: number; longitude: number; label: string };
 
-export function CompanyLocation({ company }: { company: Company }) {
+export function CompanyLocation({ company, onboarding = false }: {
+  company: Pick<Company, "latitude" | "longitude" | "radiusMeters" | "trackingRadiusMeters">;
+  onboarding?: boolean;
+}) {
+  const [selected, setSelected] = useState(!onboarding);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -33,7 +37,7 @@ export function CompanyLocation({ company }: { company: Company }) {
         setQuery("");
         setResults([]);
         setSearchMessage("");
-        setLocationMessage(`Current location selected (estimated accuracy: ${Math.round(coords.accuracy)} m). Check the marker, then click Save settings to apply it.`);
+        setLocationMessage(`Current location selected (estimated accuracy: ${Math.round(coords.accuracy)} m). Check the pin before submitting the form.`);
       },
       (error) => {
         setLocating(false);
@@ -75,7 +79,7 @@ export function CompanyLocation({ company }: { company: Company }) {
     import("leaflet").then((L) => {
       if (disposed || !container.current) return;
       const center: [number, number] = [company.latitude, company.longitude];
-      const instance = L.map(container.current).setView(center, 17);
+      const instance = L.map(container.current).setView(center, onboarding ? 5 : 17);
       map.current = instance;
       const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -83,15 +87,25 @@ export function CompanyLocation({ company }: { company: Company }) {
       }).addTo(instance);
       tiles.on("tileerror", () => setStatus("Map tiles could not load. Check your internet connection."));
       tiles.on("load", () => setStatus(""));
-      const marker = L.circleMarker(center, { radius: 7, color: "#50358c", fillOpacity: 1 }).addTo(instance);
-      const warningCircle = L.circle(center, { radius: company.trackingRadiusMeters, color: "#b45309", fillColor: "#f59e0b", fillOpacity: 0.08, dashArray: "7 5", interactive: false }).addTo(instance);
+      const marker = L.circleMarker(center, { radius: 7, color: "#50358c", fillOpacity: 1 });
+      const warningCircle = L.circle(center, { radius: company.trackingRadiusMeters, color: "#b45309", fillColor: "#f59e0b", fillOpacity: 0.08, dashArray: "7 5", interactive: false });
       warningBoundary.current = warningCircle;
-      const circle = L.circle(center, { radius: company.radiusMeters, color: "#50358c", fillOpacity: 0.12, interactive: false }).addTo(instance);
-      marker.bringToFront();
+      const circle = L.circle(center, { radius: company.radiusMeters, color: "#50358c", fillOpacity: 0.12, interactive: false });
+      if (!onboarding) {
+        warningCircle.addTo(instance);
+        circle.addTo(instance);
+        marker.addTo(instance).bringToFront();
+      }
       setMapReady(true);
       boundary.current = circle;
       const select = (point: L.LatLng) => {
         const selected = point.wrap();
+        if (!instance.hasLayer(marker)) {
+          warningCircle.addTo(instance);
+          circle.addTo(instance);
+          marker.addTo(instance).bringToFront();
+        }
+        setSelected(true);
         marker.setLatLng(selected);
         circle.setLatLng(selected);
         warningCircle.setLatLng(selected);
@@ -117,19 +131,19 @@ export function CompanyLocation({ company }: { company: Company }) {
       boundary.current = null;
       warningBoundary.current = null;
     };
-  }, [company.latitude, company.longitude, company.radiusMeters, company.trackingRadiusMeters]);
+  }, [company.latitude, company.longitude, company.radiusMeters, company.trackingRadiusMeters, onboarding]);
 
   useEffect(() => {
     if (Number(radius) > 0) boundary.current?.setRadius(Number(radius));
     if (Number(trackingRadius) > 0) warningBoundary.current?.setRadius(Number(trackingRadius));
-    if (boundary.current && warningBoundary.current) {
+    if (selected && boundary.current && warningBoundary.current) {
       map.current?.fitBounds(boundary.current.getBounds().extend(warningBoundary.current.getBounds()), { padding: [24, 24], maxZoom: 18 });
     }
-  }, [radius, trackingRadius, mapReady]);
+  }, [radius, trackingRadius, mapReady, selected]);
 
   return (
     <div>
-      <div className="company-address-search">
+      {!onboarding && <div className="company-address-search">
         <label htmlFor="company-address-query" className="company-address-label">Find your company</label>
         <p className="muted">Search an address or place, then choose a result.</p>
         <div className="company-address-bar">
@@ -146,8 +160,8 @@ export function CompanyLocation({ company }: { company: Company }) {
           setSearchMessage(`Selected: ${result.label}`);
         }}><span className="company-result-pin"><MapPin size={19} aria-hidden="true" /></span><span className="company-result-address">{result.label}</span><ArrowUpRight size={17} aria-hidden="true" /></button></li>)}</ul>}
         <small className="company-search-provider">Address search by Photon / OpenStreetMap</small>
-      </div>
-      <p id="company-map-help" className="company-map-help muted">Click the map to fine-tune the location. Both circles share the company location.</p>
+      </div>}
+      <p id="company-map-help" className="company-map-help muted">Click the map to place the branch pin, or use your current location. Both circles share the selected location.</p>
       <details className="company-map-keyboard"><summary>Keyboard controls</summary><p>Use arrow keys to pan the map, then Enter to select its centre.</p></details>
       <div className="company-map-container">
       <div ref={container} role="region" aria-label="Company location map" aria-describedby="company-map-help" style={{ height: 360, width: "100%", position: "relative", zIndex: 0, borderRadius: 12, marginBottom: 12 }} />
@@ -161,14 +175,14 @@ export function CompanyLocation({ company }: { company: Company }) {
         <li><span className="company-map-swatch company-map-manual" aria-hidden="true" />Check-in / check-out: {radius || "—"} m</li>
         <li><span className="company-map-swatch company-map-warning" aria-hidden="true" />Warning / automatic checkout: {trackingRadius || "—"} m</li>
       </ul>
-      <p role="status" className="muted">{status || `Selected location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`}</p>
-      <input type="hidden" name="latitude" value={location.latitude} />
-      <input type="hidden" name="longitude" value={location.longitude} />
+      <p role="status" className="muted">{status || (!selected ? "Choose the branch location on the map." : `Selected location: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`)}</p>
+      <input type="hidden" name="latitude" value={selected ? location.latitude : ""} />
+      <input type="hidden" name="longitude" value={selected ? location.longitude : ""} />
       <Field label="Check-in / check-out radius (metres)">
-        <input name="radiusMeters" type="number" min={1} step="any" required value={radius} onChange={(event) => setRadius(event.target.value)} />
+        <input name="radiusMeters" type="number" min={1} max={onboarding ? 10000 : undefined} step="any" required value={radius} onChange={(event) => setRadius(event.target.value)} />
       </Field>
       <Field label="Warning / automatic checkout radius (metres)">
-        <input name="trackingRadiusMeters" type="number" min={1} step="any" required value={trackingRadius} onChange={(event) => setTrackingRadius(event.target.value)} />
+        <input name="trackingRadiusMeters" type="number" min={1} max={onboarding ? 10000 : undefined} step="any" required value={trackingRadius} onChange={(event) => setTrackingRadius(event.target.value)} />
         <small>Employees outside this distance from the company location receive a warning after reliable departure confirmation.</small>
       </Field>
     </div>

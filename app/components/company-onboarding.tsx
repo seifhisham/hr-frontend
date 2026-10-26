@@ -4,6 +4,7 @@ import Link from "next/link";
 import { send } from "../../lib/api";
 import { Field } from "./modal";
 import { OwnerFrame } from "./owner-portal";
+import { CompanyLocation } from "./company-location";
 type Invitation = {
   workspace: string;
   companyName: string;
@@ -47,6 +48,8 @@ export function CompanyOnboarding() {
     setBusy(true);
     setError("");
     try {
+      if (!form.get("latitude") || !form.get("longitude"))
+        throw new Error("Choose the branch location on the map before completing setup.");
       await send("/onboarding/accept", "POST", {
         token,
         name: form.get("name"),
@@ -133,47 +136,11 @@ export function CompanyOnboarding() {
             <Field label="Branch address">
               <input name="address" maxLength={500} />
             </Field>
+            <CompanyLocation
+              onboarding
+              company={{ latitude: 30, longitude: 31, radiusMeters: 50, trackingRadiusMeters: 150 }}
+            />
             <div className="form-grid">
-              <Field label="Latitude">
-                <input
-                  name="latitude"
-                  type="number"
-                  step="any"
-                  min={-90}
-                  max={90}
-                  required
-                />
-              </Field>
-              <Field label="Longitude">
-                <input
-                  name="longitude"
-                  type="number"
-                  step="any"
-                  min={-180}
-                  max={180}
-                  required
-                />
-              </Field>
-              <Field label="Attendance radius (metres)">
-                <input
-                  name="radiusMeters"
-                  type="number"
-                  min={1}
-                  max={10000}
-                  defaultValue={50}
-                  required
-                />
-              </Field>
-              <Field label="Tracking radius (metres)">
-                <input
-                  name="trackingRadiusMeters"
-                  type="number"
-                  min={1}
-                  max={10000}
-                  defaultValue={150}
-                  required
-                />
-              </Field>
               <Field label="Return grace (minutes)">
                 <input
                   name="trackingGraceMinutes"
@@ -186,7 +153,7 @@ export function CompanyOnboarding() {
               </Field>
             </div>
             <p>
-              Set the actual office coordinates. The owner will activate the
+              Place the pin at the actual branch entrance on the map. The owner will activate the
               company after setup is complete.
             </p>
             <button className="button primary" disabled={busy}>

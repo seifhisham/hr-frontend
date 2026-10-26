@@ -67,6 +67,8 @@ function render(file, states, form, handler = async () => ({}), effects = []) {
                 },
                 api: async () => [],
               }
+            : name === "./company-location"
+              ? { CompanyLocation: "company-location-picker" }
             : name === "qrcode.react"
               ? { QRCodeSVG: "authenticator-qr" }
               : {},
@@ -282,6 +284,8 @@ test("administrator invitation acceptance submits numeric branch policy through 
     ).props.minLength,
     8,
   );
+  assert.equal(tree.find(node => node.type === "company-location-picker").props.onboarding, true);
+  assert.equal(tree.some(node => node.type === "input" && ["latitude", "longitude"].includes(node.props.name)), false);
   await tree.find((node) => node.type === "form")
     .props.onSubmit(event);
   assert.equal(view.calls[0][0], "/onboarding/accept");
@@ -306,5 +310,17 @@ test("owner branch limit form sends a number or unlimited through REST", async (
     await form.props.onSubmit(event);
     assert.equal(view.calls[0][0], "/owner/companies/company-id/branch-limit");
     assert.deepEqual(plain(view.calls[0][2]), { branchLimit: value ? 3 : null, reason: "Reviewed customer allowance" });
+  }
+});
+
+
+test("company setup refuses submission until a branch pin is selected", async () => {
+  for (const coordinates of [{}, { latitude: "", longitude: "" }]) {
+    const view = render("company-onboarding.tsx", ["token", {companyName:"Customer",workspace:"customer"}, false, false, ""], {
+      name: "Admin", password: "new-admin-password", branchName: "Office", ...coordinates,
+    });
+    const tree = nodes(view.components.CompanyOnboarding());
+    await tree.find(node => node.type === "form").props.onSubmit(event);
+    assert.equal(view.calls.length, 0, "No onboarding API call without an explicitly selected pin");
   }
 });

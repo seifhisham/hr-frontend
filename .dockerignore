@@ -2,6 +2,9 @@ node_modules
 .next
 .git
 .env*
+.secrets
+*-firebase-adminsdk-*.json
+hodour-fcm-adc.json
 coverage
 *.log
 .tmp

@@ -307,6 +307,8 @@ export type NotificationItem = {
     | "request-decided"
     | "request-reopened"
     | "pending-request"
+    | "employee-checked-in"
+    | "employee-checked-out"
     | "missing-check-out";
   title: string;
   message: string;

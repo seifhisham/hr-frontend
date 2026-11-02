@@ -50,6 +50,7 @@ import { Badge, Field } from "./modal";
 import { PasswordField } from "./password-field";
 import Link from "next/link";
 import { CorrectionEditor, EmployeeEditor, ScheduleEditor } from "./editors";
+import { EmployeeImport } from "./employee-import";
 import { Requests } from "./requests";
 import { Payroll } from "./payroll";
 import { Reports } from "./reports";
@@ -154,6 +155,7 @@ export default function Dashboard() {
   const [employeeEditor, setEmployeeEditor] = useState<Employee | "new" | null>(
     null,
   );
+  const [employeeImport, setEmployeeImport] = useState(false);
   const [scheduleEditor, setScheduleEditor] = useState<Schedule | "new" | null>(
     null,
   );
@@ -747,6 +749,11 @@ export default function Dashboard() {
                 >
                   <Plus size={17} />
                   Add employee
+                </button>
+              )}
+              {view === "employees" && (
+                <button className="button secondary" onClick={() => setEmployeeImport(true)}>
+                  Import CSV
                 </button>
               )}
               {view === "attendance" && (
@@ -1372,6 +1379,12 @@ export default function Dashboard() {
           close={() => setEmployeeEditor(null)}
           saved={loadCore}
         />
+      )}
+      {employeeImport && (session.user.role === "admin" || session.user.role === "hr") && (
+        <EmployeeImport branches={branches} schedules={schedules} departments={departments}
+          role={session.user.role} employees={employees}
+          workspace={session.workspace ?? ""}
+          close={() => setEmployeeImport(false)} saved={loadCore} />
       )}
       {scheduleEditor && (
         <ScheduleEditor

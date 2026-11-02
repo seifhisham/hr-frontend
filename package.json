@@ -10,6 +10,7 @@
     "test:reports": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.51.0",
     "next": "16.3.8",

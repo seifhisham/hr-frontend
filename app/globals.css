@@ -2108,3 +2108,35 @@ tbody tr:hover {
 .settings-save-toast.error { color: #912d32; background: #fff5f5; border-color: #edc3c5; border-left-color: #c4444b; }
 .settings-save-toast.warning { color: #865414; background: #fffbef; border-color: #eed9a7; border-left-color: #b7791f; }
 @media (max-width: 480px) { .settings-save-toast { top: 16px; right: 16px; } }
+
+/* Employee import uses labeled cards to keep editable fields out of narrow table cells. */
+.employee-import-modal { width: 1040px; }
+.employee-import-modal .modal-header { position: sticky; top: 0; background: white; z-index: 2; }
+.employee-import-body { padding: 24px; display: grid; gap: 20px; }
+.employee-import-body > p, .employee-import-defaults > p { margin: 0; line-height: 1.6; }
+.employee-import-defaults, .employee-import-card fieldset { border: 0; padding: 0; min-width: 0; }
+.employee-import-defaults legend { padding: 0; margin-bottom: 6px; font-weight: 650; }
+.employee-import-defaults > p, .employee-import-help { color: var(--muted); font-size: 13px; }
+.employee-import-modal .form-grid { padding: 18px 0 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.employee-import-modal .field { min-width: 0; }
+.employee-import-modal .field input, .employee-import-modal .field select { width: 100%; min-width: 0; }
+.employee-import-modal .field small { display: block; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.employee-import-summary { padding: 14px 18px; background: #f4f1fa; border: 1px solid var(--line); border-radius: 12px; font-weight: 600; }
+.employee-import-cards { display: grid; gap: 12px; }
+.employee-import-card { border: 1px solid var(--line); border-radius: 14px; padding: 0 18px; }
+.employee-import-card summary { display: flex; align-items: center; gap: 14px; padding: 18px 0; cursor: pointer; }
+.employee-import-card summary::after { content: '+'; font-size: 22px; color: var(--muted); }
+.employee-import-card[open] summary::after { content: '−'; }
+.employee-import-card summary:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; border-radius: 6px; }
+.employee-import-row { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.employee-import-person { display: grid; gap: 5px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.employee-import-person small { color: var(--muted); }
+.employee-import-status { border-radius: 20px; padding: 6px 10px; background: #f2f0f6; font-size: 12px; text-transform: capitalize; white-space: nowrap; }
+.employee-import-status.ready, .employee-import-status.created { background: #edf6ef; color: #286140; }
+.employee-import-status.invalid, .employee-import-status.failed { background: #fff0ec; color: #a0412b; }
+.employee-import-card fieldset { padding: 0 0 20px; }
+.employee-import-row-message { color: #a0412b; font-size: 13px; line-height: 1.6; margin: 0; }
+.employee-import-modal .modal-footer { position: sticky; bottom: 0; background: white; z-index: 2; flex-wrap: wrap; }
+.employee-import-modal .error { margin: 0; }
+@media(max-width: 760px) { .employee-import-modal .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 520px) { .employee-import-body { padding: 18px; } .employee-import-modal .form-grid { grid-template-columns: minmax(0, 1fr); } .employee-import-card summary { flex-wrap: wrap; gap: 10px; } .employee-import-row { width: 100%; } .employee-import-card { padding: 0 14px; } }

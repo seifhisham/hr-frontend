@@ -26,6 +26,7 @@ import {
   Settings2,
   ShieldCheck,
   Users,
+  Trash2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -51,6 +52,7 @@ import { PasswordField } from "./password-field";
 import Link from "next/link";
 import { CorrectionEditor, EmployeeEditor, ScheduleEditor } from "./editors";
 import { EmployeeImport } from "./employee-import";
+import { EmployeeDelete } from "./employee-delete";
 import { Requests } from "./requests";
 import { Payroll } from "./payroll";
 import { Reports } from "./reports";
@@ -156,6 +158,7 @@ export default function Dashboard() {
     null,
   );
   const [employeeImport, setEmployeeImport] = useState(false);
+  const [employeeDeletion, setEmployeeDeletion] = useState<Employee | null>(null);
   const [scheduleEditor, setScheduleEditor] = useState<Schedule | "new" | null>(
     null,
   );
@@ -169,6 +172,7 @@ export default function Dashboard() {
       setBranches([]);
       setSchedules([]);
       setEmployeeEditor(null);
+      setEmployeeDeletion(null);
       setCorrection(null);
       setScheduleEditor(null);
     }
@@ -333,6 +337,7 @@ export default function Dashboard() {
       setBranches([]);
       setSchedules([]);
       setEmployeeEditor(null);
+      setEmployeeDeletion(null);
       setCorrection(null);
       setScheduleEditor(null);
       setBranchId("");
@@ -1147,6 +1152,9 @@ export default function Dashboard() {
                           >
                             <Pencil size={16} />
                           </button>
+                          {e.id !== session.user.employeeId && (session.user.role === "admin" || e.role === "employee" || e.role === "manager") && (
+                            <button className="icon-button" type="button" title={`Delete ${e.name}`} aria-label={`Delete ${e.name}`} onClick={() => setEmployeeDeletion(e)}><Trash2 size={16} /></button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1367,6 +1375,11 @@ export default function Dashboard() {
           <span>People & attendance</span>
         </footer>
       </div>
+      {employeeDeletion && <EmployeeDelete employee={employeeDeletion} close={() => setEmployeeDeletion(null)} deleted={() => {
+        setEmployees(current => current.filter(employee => employee.id !== employeeDeletion.id));
+        setRequestRevision(value => value + 1);
+        void loadCore().catch(handleError);
+      }} />}
       {employeeEditor && (
         <EmployeeEditor
           employee={employeeEditor === "new" ? null : employeeEditor}

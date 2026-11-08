@@ -75,7 +75,7 @@ export function Reports({
     });
     Promise.all([
       api<Attendance[]>(`/attendance?${query}`),
-      api<Employee[]>("/employees"),
+      api<Employee[]>("/employees?includeDeleted=true"),
       allRequests(),
       api<PayrollDeduction[]>(
         `/payroll/deductions?${new URLSearchParams({ from, to })}`,

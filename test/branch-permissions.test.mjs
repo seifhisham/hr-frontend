@@ -29,7 +29,7 @@ test('saving HR permissions sends only the selected branches and audit reason',a
 });
 test('only company administrators see payroll approval controls',()=>{
  const run={month:'2026-10',status:'draft',rows:[],revision:'reviewed',timezone:'Africa/Cairo'};
- const state=['2026-10',null,null,0,{month:'2026-10',revision:0,version:0,run},null];
+ const state=['2026-10',null,null,false,0,{month:'2026-10',revision:0,version:0,run},null];
  for(const canApprove of [false,true]){
   const tree=nodes(component('payroll.tsx',state).Payroll({today:'2026-10-15',revision:0,canApprove,onError:()=>{}}));
   assert.equal(tree.some(node=>node.type==='button'&&node.props.children==='Approve and lock month'),canApprove);

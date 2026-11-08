@@ -8,6 +8,7 @@ import {
   type PayrollRun,
 } from "../../lib/api";
 import { Badge, Field, Modal } from "./modal";
+import { BankPayroll } from "./bank-payroll";
 
 const money = (value: number | null, currency: string) =>
   value === null
@@ -33,6 +34,7 @@ export function Payroll({
   const [month, setMonth] = useState(today.slice(0, 7));
   const [editing, setEditing] = useState<PayrollRow | null>(null);
   const [approving, setApproving] = useState<PayrollRun | null>(null);
+  const [bankExport, setBankExport] = useState(false);
   const [version, setVersion] = useState(0);
   const [result, setResult] = useState<{
     month: string;
@@ -88,12 +90,14 @@ export function Payroll({
               setMonth(event.target.value);
               setEditing(null);
               setApproving(null);
+              setBankExport(false);
             }}
           />
         </Field>
         {run && (
           <Badge value={run.status === "approved" ? "approved" : "draft"} />
         )}
+        <button className="button secondary" type="button" disabled={!rows?.length} onClick={() => setBankExport(true)}>Bank payroll file</button>
         {canApprove && run?.status === "draft" && (
           <button
             className="button primary"
@@ -232,6 +236,7 @@ export function Payroll({
         </p>
       )}
       {rows?.length === 0 && <p>No employees for this month.</p>}
+      {bankExport && run && <BankPayroll key={`${run.month}:${run.revision}`} run={run} today={today} close={() => setBankExport(false)} />}
       {approving && (
         <ApprovalEditor
           run={approving}

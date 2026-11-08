@@ -63,6 +63,7 @@ export type Employee = {
   salesEnabled: boolean;
   role: Role;
   managerId?: string | null;
+  deletedAt?: string;
 };
 export type PayrollRow = {
   employeeId: string;
@@ -95,6 +96,22 @@ export type PayrollDeduction = {
   recordedAt: string;
   recordedBy: string;
   recordedById: string;
+};
+export type EmployeeBankDetails = {
+  employeeId: string;
+  beneficiaryName: string;
+  account: string;
+  swift: string;
+};
+export type BankDetails = {
+  settings: {
+    debitAccount: string;
+    transactionTypeCode: string;
+    purposeCode: string;
+    paymentType: string;
+    purposeOfPayment: string;
+  };
+  employees: EmployeeBankDetails[];
 };
 export type Attendance = {
   employeeNumber?: string;
@@ -231,7 +248,7 @@ export async function api<T>(
 }
 export const send = <T>(
   path: string,
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "DELETE",
   body?: unknown,
 ) =>
   api<T>(path, {
@@ -241,7 +258,7 @@ export const send = <T>(
 
 export async function save<T>(
   path: string,
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "DELETE",
   body?: unknown,
 ): Promise<T> {
   notifySave(null);

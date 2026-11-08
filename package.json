@@ -10,6 +10,7 @@
     "test:reports": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.51.0",
@@ -17,6 +18,9 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
+  },
+  "overrides": {
+    "exceljs": { "uuid": "11.1.1" }
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

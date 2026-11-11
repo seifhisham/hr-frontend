@@ -29,9 +29,17 @@ test("save reports server errors and still rejects for the form's error handling
   assert.equal(toasts.at(-1).tone, "error");
   assert.match(toasts.at(-1).message, /Name is required/);
 });
+test("API errors show each validation problem without comma-joining them", async () => {
+  const { api } = setup(async () => ({ ok: false, status: 400, json: async () => ({ message: ["Name is required", "Email is invalid"] }) }));
+  await assert.rejects(api.api("/employees"), /Name is required; Email is invalid/);
+});
+test("API errors explain failures when the server has no message", async () => {
+  const { api } = setup(async () => ({ ok: false, status: 403, json: async () => null }));
+  await assert.rejects(api.api("/employees"), /do not have permission/);
+});
 test("network failure reports an uncertain save without claiming the data was lost", async () => {
   const { api, toasts } = setup(async () => { throw new Error("offline"); });
-  await assert.rejects(api.save("/schedules", "PATCH", {}), /Unable to reach/);
+  await assert.rejects(api.save("/schedules", "PATCH", {}), /Check your connection/);
   assert.equal(toasts.at(-1).tone, "error");
   assert.match(toasts.at(-1).message, /Could not confirm/);
 });

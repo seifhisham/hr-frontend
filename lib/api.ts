@@ -231,16 +231,27 @@ export async function api<T>(
       headers: { "Content-Type": "application/json", ...options.headers },
     });
   } catch {
-    throw new ApiError("Unable to reach the server. Please try again.", 0);
+    throw new ApiError("Could not connect to the server. Check your connection and try again.", 0);
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as {
       message?: string | string[];
     } | null;
+    const message = Array.isArray(body?.message)
+      ? body.message.filter(Boolean).join("; ")
+      : body?.message;
     throw new ApiError(
-      body?.message
-        ? String(body.message)
-        : "Request failed. Please try again.",
+      message || ({
+        400: "Check the information you entered and try again.",
+        401: "Your session has expired. Sign in and try again.",
+        403: "You do not have permission to do this. Contact an administrator if you need access.",
+        404: "The requested item could not be found. Refresh the page and try again.",
+        409: "This information has changed or already exists. Refresh the page and try again.",
+        429: "Too many attempts. Wait a moment and try again.",
+      } as Record<number, string>)[res.status] ||
+        (res.status >= 500
+          ? "The server could not complete your request. Try again in a moment."
+          : "Could not complete your request. Please try again."),
       res.status,
     );
   }

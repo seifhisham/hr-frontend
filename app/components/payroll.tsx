@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
+import { FileSpreadsheet } from "lucide-react";
 import {
   ApiError,
   api,
@@ -76,40 +77,84 @@ export function Payroll({
     failure?.month === month &&
     failure.revision === revision &&
     failure.version === version;
+  const approvalHint = !rows?.length
+    ? "No employees to approve for this month"
+    : rows.some((row) => row.grossSalary === null)
+      ? "Set missing salaries under Employees before approving"
+      : month > today.slice(0, 7)
+        ? "Approval is available when this month begins"
+        : null;
   return (
     <section className="section">
-      <div className="request-filters">
-        <Field label="Payroll month">
-          <input
-            type="month"
-            value={month}
-            min="1000-01"
-            max="9999-12"
-            required
-            onChange={(event) => {
-              setMonth(event.target.value);
-              setEditing(null);
-              setApproving(null);
-              setBankExport(false);
-            }}
-          />
-        </Field>
-        {run && (
-          <Badge value={run.status === "approved" ? "approved" : "draft"} />
-        )}
-        <button className="button secondary" type="button" disabled={!rows?.length} onClick={() => setBankExport(true)}>Bank payroll file</button>
-        {canApprove && run?.status === "draft" && (
-          <button
-            className="button primary"
-            disabled={
-              !rows?.length ||
-              rows.some((row) => row.grossSalary === null) ||
-              month > today.slice(0, 7)
-            }
-            onClick={() => setApproving(run)}
+      <div className="payroll-toolbar">
+        <div className="payroll-toolbar-row">
+          <div className="payroll-period">
+            <Field label="Payroll month">
+              <input
+                type="month"
+                name="payrollMonth"
+                autoComplete="off"
+                value={month}
+                min="1000-01"
+                max="9999-12"
+                required
+                onChange={(event) => {
+                  setMonth(event.target.value);
+                  setEditing(null);
+                  setApproving(null);
+                  setBankExport(false);
+                }}
+              />
+            </Field>
+            {run && (
+              <div className="payroll-run-state" aria-live="polite">
+                <Badge
+                  value={run.status === "approved" ? "approved" : "draft"}
+                />
+                <span>
+                  {run.rows.length} {run.rows.length === 1 ? "employee" : "employees"}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="payroll-actions">
+            <button
+              className="button secondary"
+              type="button"
+              disabled={!rows?.length}
+              aria-haspopup="dialog"
+              onClick={() => setBankExport(true)}
+            >
+              <FileSpreadsheet
+                size={16}
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              Bank payroll file
+            </button>
+            {canApprove && run?.status === "draft" && (
+              <button
+                className="button primary"
+                type="button"
+                disabled={!!approvalHint}
+                aria-describedby={
+                  approvalHint ? "payroll-approval-help" : undefined
+                }
+                onClick={() => setApproving(run)}
+              >
+                Approve and lock month
+              </button>
+            )}
+          </div>
+        </div>
+        {canApprove && run?.status === "draft" && approvalHint && (
+          <p
+            className="payroll-approval-help"
+            id="payroll-approval-help"
+            role="status"
           >
-            Approve and lock month
-          </button>
+            {approvalHint}
+          </p>
         )}
       </div>
       {run?.status === "approved" && (
@@ -123,8 +168,9 @@ export function Payroll({
             dateStyle: "medium",
             timeStyle: "short",
           }).format(new Date(run.approvedAt!))}
-          . {run.approvalReason ? `Reason: ${run.approvalReason}. ` : ""}These saved salaries and deductions
-          will not change when employee records are edited.
+          . {run.approvalReason ? `Reason: ${run.approvalReason}. ` : ""}These
+          saved salaries and deductions will not change when employee records
+          are edited.
         </p>
       )}
       <p className="muted">
@@ -236,7 +282,14 @@ export function Payroll({
         </p>
       )}
       {rows?.length === 0 && <p>No employees for this month.</p>}
-      {bankExport && run && <BankPayroll key={`${run.month}:${run.revision}`} run={run} today={today} close={() => setBankExport(false)} />}
+      {bankExport && run && (
+        <BankPayroll
+          key={`${run.month}:${run.revision}`}
+          run={run}
+          today={today}
+          close={() => setBankExport(false)}
+        />
+      )}
       {approving && (
         <ApprovalEditor
           run={approving}

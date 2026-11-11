@@ -1021,6 +1021,61 @@ tbody tr:hover {
   border-radius: 18px;
   background: white;
 }
+.payroll-toolbar {
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+}
+.payroll-toolbar-row,
+.payroll-period,
+.payroll-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.payroll-toolbar-row {
+  justify-content: space-between;
+  gap: 20px 32px;
+}
+.payroll-period { gap: 16px; min-width: 0; }
+.payroll-period .field { width: 216px; gap: 8px; font-weight: 500; }
+.payroll-period input { min-height: 44px; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.payroll-run-state {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.payroll-run-state .badge { align-self: auto; border-radius: 6px; font-size: 12px; font-weight: 500; padding: 4px 8px; }
+.payroll-actions { gap: 8px; margin-left: auto; }
+.payroll-actions .button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+.payroll-actions .button:disabled { opacity: 1; color: var(--muted); background: #f2f3f5; border-color: var(--line); }
+.payroll-approval-help { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 20px; }
+@media (max-width: 640px) {
+  .payroll-toolbar { padding: 16px; }
+  .payroll-toolbar-row { gap: 16px; }
+  .payroll-period { flex: 1 1 100%; gap: 8px 16px; }
+  .payroll-period .field { flex: 1 1 180px; width: auto; }
+  .payroll-run-state { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; }
+  .payroll-actions { flex: 1 1 100%; margin-left: 0; }
+  .payroll-actions .button { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .payroll-actions .button { transition: none; }
+}
 .request-status-group,
 .request-list-controls,
 .request-pagination,

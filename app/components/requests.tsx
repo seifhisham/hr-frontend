@@ -6,6 +6,7 @@ import {
   save,
   dateLabel,
   time,
+  type DeductionPolicy,
   type EmployeeRequest,
   type Schedule,
 } from "../../lib/api";
@@ -130,7 +131,7 @@ function RequestForm({ today, saved }: { today: string; saved: () => void }) {
         <div><h2>New request</h2><p>Choose a request type, dates, and provide the details for review.</p></div>
       </div>
       <p className="personal-request-policy">
-        Approval deducts 1 salary day. Rejection deducts 3 salary days. This applies once per request.
+        Approved and rejected requests may deduct salary days set by HR. This applies once per request.
       </p>
       <fieldset disabled={busy} className="form-grid">
         <Field label="Request type">
@@ -486,6 +487,22 @@ function RequestReview({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shifts, setShifts] = useState<Schedule[]>([]);
+  const [rule, setRule] = useState<
+    DeductionPolicy["requests"][keyof DeductionPolicy["requests"]] | null
+  >(null);
+  useEffect(() => {
+    let alive = true;
+    if (canDecide && request.status === "pending")
+      api<DeductionPolicy>("/deduction-policy")
+        .then((policy) => {
+          if (alive) setRule(policy.requests[request.type]);
+        })
+        // The decision itself still applies the server's rules.
+        .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [canDecide, request.status, request.type]);
   useEffect(() => {
     let alive = true;
     if (request.type === "excuse")
@@ -585,13 +602,14 @@ function RequestReview({
           <Field label="Salary deduction">
             <span>{deduction(request)}</span>
           </Field>
-          {request.type !== "forgotten-check-out" &&
-            request.status === "pending" && (
-              <p>
-                Approval deducts 1 salary day. Rejection deducts 3 salary days.
-                This applies once per request, regardless of its length.
-              </p>
-            )}
+          {canDecide && request.status === "pending" && (
+            <p>
+              {rule
+                ? `Under the current deduction rules, approval deducts ${rule.approved} and rejection deducts ${rule.rejected} salary ${rule.rejected === 1 ? "day" : "days"}.`
+                : "Approval or rejection applies the current deduction rules."}{" "}
+              This applies once per request, regardless of its length.
+            </p>
+          )}
           {request.attendance && (
             <>
               <Field label="Workday">

@@ -85,6 +85,13 @@ export type PayrollRow = {
     days: number;
   }[];
   manualDeductions: PayrollDeduction[];
+  lateDeductions?: {
+    attendanceId: string;
+    workDate: string;
+    minutesLate: number;
+    days: number;
+    exemption: "free-allowance" | "approved-request" | null;
+  }[];
 };
 export type PayrollDeduction = {
   id: string;
@@ -259,7 +266,7 @@ export async function api<T>(
 }
 export const send = <T>(
   path: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
 ) =>
   api<T>(path, {
@@ -269,7 +276,7 @@ export const send = <T>(
 
 export async function save<T>(
   path: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
 ): Promise<T> {
   notifySave(null);
@@ -446,4 +453,48 @@ export type SalesPerformance = {
     deals: number | null;
     transactionValue: number | null;
   };
+};
+
+export type RequestRuleType =
+  | "leave"
+  | "holiday"
+  | "sick"
+  | "unpaid"
+  | "urgent"
+  | "mission"
+  | "excuse"
+  | "forgotten-check-out";
+export type DeductionPolicyRules = {
+  requests: Record<RequestRuleType, { approved: number; rejected: number }>;
+  lateArrival: {
+    enabled: boolean;
+    freeLatesPerMonth: number;
+    exemptApprovedRequests: boolean;
+    tiers: { fromMinutes: number; days: number }[];
+  };
+};
+export type DeductionPolicy = DeductionPolicyRules & {
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+export type DeductionAdjustment = {
+  originalDays: number;
+  reason: string;
+  by: string;
+  byId: string;
+  at: string;
+};
+export type AutomaticDeduction = {
+  source: "request" | "late";
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  department: string;
+  date: string | null;
+  detail: string;
+  automaticDays: number;
+  days: number;
+  adjustment: DeductionAdjustment | null;
+  locked: boolean;
 };

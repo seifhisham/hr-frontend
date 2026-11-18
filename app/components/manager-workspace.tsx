@@ -9,7 +9,7 @@ import {
   type Attendance,
   type Session,
 } from "../../lib/api";
-import { Building2, ClipboardList, Clock3, ChevronRight, Menu, X } from "lucide-react";
+import { Building2, ClipboardList, Clock3, ChevronRight, LogOut, Menu, X } from "lucide-react";
 import { Field } from "./modal";
 import { Requests } from "./requests";
 import { Sales } from "./sales";
@@ -83,8 +83,11 @@ export function ManagerWorkspace({
         <div className="sidebar-bottom">
           <button className="profile" onClick={logout} aria-label="Sign out">
             <span className="avatar">{initials(session.user.name)}</span>
-            <strong>{session.user.name}</strong>
-            <span className="profile-action">Sign out</span>
+            <span className="profile-text">
+              <strong>{session.user.name}</strong>
+              <small>Manager · Sign out</small>
+            </span>
+            <span className="profile-action" aria-hidden="true"><LogOut size={16} /></span>
           </button>
         </div>
       </aside>

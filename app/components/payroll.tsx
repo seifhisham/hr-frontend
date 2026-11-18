@@ -234,6 +234,21 @@ export function Payroll({
                       ))}
                     </details>
                   )}
+                  {(row.lateDeductions?.length ?? 0) > 0 && (
+                    <details>
+                      <summary>Late arrivals</summary>
+                      {row.lateDeductions!.map((item) => (
+                        <p key={item.attendanceId}>
+                          {item.workDate}: {item.minutesLate} min late ·{" "}
+                          {item.exemption === "free-allowance"
+                            ? "free allowance"
+                            : item.exemption === "approved-request"
+                              ? "covered by approved request"
+                              : `${item.days} ${item.days === 1 ? "day" : "days"}`}
+                        </p>
+                      ))}
+                    </details>
+                  )}
                   {row.manualDeductions.length > 0 && (
                     <details>
                       <summary>HR deductions</summary>

@@ -22,6 +22,8 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ReceiptText,
+  Scale,
   Search,
   Settings2,
   ShieldCheck,
@@ -55,6 +57,8 @@ import { EmployeeImport } from "./employee-import";
 import { EmployeeDelete } from "./employee-delete";
 import { Requests } from "./requests";
 import { Payroll } from "./payroll";
+import { DeductionRules } from "./deduction-rules";
+import { AutomaticDeductions } from "./automatic-deductions";
 import { Reports } from "./reports";
 import { Departments } from "./departments";
 import { Notifications } from "./notifications";
@@ -78,6 +82,8 @@ type View =
   | "sales"
   | "branches"
   | "settings"
+  | "deduction-rules"
+  | "automatic-deductions"
   | "account";
 const navigation: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -86,6 +92,12 @@ const navigation: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "manager-reviews", label: "Manager reviews", icon: ClipboardList },
   { id: "reports", label: "Reports", icon: ClipboardList },
   { id: "payroll", label: "Payroll", icon: CalendarDays },
+  { id: "deduction-rules", label: "Deduction rules", icon: Scale },
+  {
+    id: "automatic-deductions",
+    label: "Automatic deductions",
+    icon: ReceiptText,
+  },
   { id: "sales", label: "Sales performance", icon: Building2 },
   { id: "departments", label: "Departments", icon: Building2 },
   { id: "employees", label: "Employees", icon: Users },
@@ -674,14 +686,21 @@ export default function Dashboard() {
         </nav>
         <div className="sidebar-bottom">
           <button
-            className="profile"
+            className={`profile ${view === "account" ? "selected" : ""}`}
             onClick={() => navigate("account")}
-            aria-label="Settings"
-            title="Settings"
+            aria-label={`Account settings for ${session.user.name}`}
+            title="Account settings"
           >
             <span className="avatar">{initials(session.user.name)}</span>
-            <strong>{session.user.name}</strong>
-            <span className="profile-action">Settings</span>
+            <span className="profile-text">
+              <strong>{session.user.name}</strong>
+              <small>
+                {session.user.role === "admin" ? "Administrator" : "HR"}
+              </small>
+            </span>
+            <span className="profile-action" aria-hidden="true">
+              <Settings2 size={16} />
+            </span>
           </button>
         </div>
       </aside>
@@ -844,6 +863,20 @@ export default function Dashboard() {
               canApprove={session.user.role === "admin"}
               today={session.today}
               revision={requestRevision}
+              onError={handleError}
+            />
+          )}
+          {view === "automatic-deductions" && (
+            <AutomaticDeductions
+              today={session.today}
+              timezone={session.company.timezone}
+              revision={requestRevision}
+              onError={handleError}
+            />
+          )}
+          {view === "deduction-rules" && (
+            <DeductionRules
+              timezone={session.company.timezone}
               onError={handleError}
             />
           )}

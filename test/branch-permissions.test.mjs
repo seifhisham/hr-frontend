@@ -6,7 +6,7 @@ import ts from 'typescript';
 function component(file,overrides=[],calls=[]){
  const code=ts.transpileModule(readFileSync(new URL('../app/components/'+file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
  let index=0;const jsx=(type,props)=>({type,props});const api={save:async(...args)=>{calls.push(args);return [];},api:async()=>[]};
- const context={exports:{},Intl,FormData:class{get(name){return name==='reason'?'Administrator reviewed responsibilities':null;}},require:name=>name==='react'?{useState:initial=>[overrides[index++]??initial,()=>{}],useEffect:()=>{}}:name==='react/jsx-runtime'?{jsx,jsxs:jsx}:name==='../../lib/api'?api:{}};
+ const context={exports:{},Intl,FormData:class{get(name){return name==='reason'?'Administrator reviewed responsibilities':null;}},require:name=>name==='react'?{useState:initial=>[overrides[index++]??initial,()=>{}],useEffect:()=>{}}:name==='react/jsx-runtime'?{jsx,jsxs:jsx}:name==='../../lib/api'?api:name==='./pager'?component('pager.tsx'):{}};
  vm.runInNewContext(code,context);return context.exports;
 }
 function nodes(tree){const result=[];function visit(node){if(Array.isArray(node)){node.forEach(visit);return;}if(!node||typeof node!=='object')return;result.push(node);visit(node.props?.children);}visit(tree);return result;}

@@ -14,12 +14,12 @@ const code = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } },
 ).outputText;
 
-function render({ size = 25, status = "pending", cursor = [], loaded = true, count = 25 } = {}) {
+function render({ size = 25, status = "pending", cursor = [], loaded = true, count = 25, total } = {}) {
   const calls = [];
   const updates = [];
   const listKey = JSON.stringify([0, 0, false, false, status, size]);
   const key = JSON.stringify([listKey, cursor.at(-1)]);
-  const states = [status, size, null, 0, { key: listKey, cursors: cursor }, loaded ? { key, rows: Array.from({ length: count }, (_, i) => ({ id: String(i), submittedAt: "2026-10-14T10:00:00Z" })) } : null];
+  const states = [status, size, null, 0, { key: listKey, cursors: cursor }, loaded ? { key, total, rows: Array.from({ length: count }, (_, i) => ({ id: String(i), submittedAt: "2026-10-14T10:00:00Z" })) } : null];
   let index = 0;
   const jsx = (type, props) => ({ type, props });
   const context = {
@@ -28,7 +28,9 @@ function render({ size = 25, status = "pending", cursor = [], loaded = true, cou
       useState: () => { const i = index++; return [states[i], (value) => updates.push([i, value])]; },
       useEffect: (effect) => effect(),
     } : name === "react/jsx-runtime" ? { jsx, jsxs: jsx } : name === "../../lib/api" ? {
-      dateLabel: (value) => value, api: async (path) => { calls.push(path); return []; },
+      dateLabel: (value) => value,
+      api: async (path) => { calls.push(path); return []; },
+      apiPage: async (path) => { calls.push(path); return { rows: [], total: null }; },
     } : {},
   };
   vm.runInNewContext(code, context);
@@ -68,3 +70,14 @@ test("request toolbar disables navigation while loading and selects filters", ()
   assert.equal(new URLSearchParams(render({ status: "", size: 50 }).calls[0].split("?")[1]).has("before"), false);
 });
 
+test("request toolbar shows the total and stops at the last full page", () => {
+  const text = (nodes, className) => [nodes.find((n) => n.props?.className === className).props.children].flat(Infinity).join("");
+  const next = (nodes) => nodes.find((n) => n.type === "button" && n.props.children?.[0] === "Next");
+  const last = render({ size: 25, cursor: ["a"], count: 25, total: 50 });
+  assert.equal(text(last.nodes, "request-page-number"), "Page 2 of 2");
+  assert.match(text(last.nodes, "request-result-count"), /Showing 26–50 of 50 requests/);
+  assert.equal(next(last.nodes).props.disabled, true);
+  const more = render({ size: 25, cursor: [], count: 25, total: 51 });
+  assert.equal(text(more.nodes, "request-page-number"), "Page 1 of 3");
+  assert.equal(next(more.nodes).props.disabled, false);
+});

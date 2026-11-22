@@ -80,18 +80,25 @@ export type PayrollRow = {
   netSalary: number | null;
   deductions: {
     requestId: string;
+    /** Absent from payroll approved before deduction adjustments existed. */
+    type?: EmployeeRequest["type"];
     status: string;
-    decidedAt: string;
+    decidedAt: string | null;
     days: number;
+    adjustment?: DeductionAdjustment | null;
   }[];
   manualDeductions: PayrollDeduction[];
-  lateDeductions?: {
-    attendanceId: string;
-    workDate: string;
-    minutesLate: number;
-    days: number;
-    exemption: "free-allowance" | "approved-request" | null;
-  }[];
+  lateDeductions?: LateDeduction[];
+};
+export type LateDeduction = {
+  attendanceId: string;
+  workDate: string;
+  minutesLate: number;
+  /** Days the rules calculate; `days` differs only after an adjustment. */
+  automaticDays?: number;
+  days: number;
+  exemption: "free-allowance" | "approved-request" | null;
+  adjustment?: DeductionAdjustment | null;
 };
 export type PayrollDeduction = {
   id: string;
@@ -229,6 +236,24 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  return (await respond(path, options)).json() as Promise<T>;
+}
+/** A list page plus the server's total across all pages, when it sends one. */
+export async function apiPage<T>(
+  path: string,
+): Promise<{ rows: T[]; total: number | null }> {
+  const res = await respond(path);
+  const header = res.headers?.get?.("X-Total-Count");
+  const total = header == null || header === "" ? NaN : Number(header);
+  return {
+    rows: (await res.json()) as T[],
+    total: Number.isFinite(total) ? total : null,
+  };
+}
+async function respond(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
@@ -262,7 +287,7 @@ export async function api<T>(
       res.status,
     );
   }
-  return res.json() as Promise<T>;
+  return res;
 }
 export const send = <T>(
   path: string,

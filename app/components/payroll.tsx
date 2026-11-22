@@ -5,11 +5,42 @@ import {
   ApiError,
   api,
   save,
+  dateLabel,
+  locationLabel,
+  time,
+  type Attendance,
+  type DeductionAdjustment,
+  type DeductionPolicy,
+  type EmployeeRequest,
+  type LateDeduction,
   type PayrollRow,
   type PayrollRun,
 } from "../../lib/api";
 import { Badge, Field, Modal } from "./modal";
 import { BankPayroll } from "./bank-payroll";
+import { RequestReview, requestNames } from "./requests";
+import { PAGE_SIZES, Pager, pageSlice } from "./pager";
+
+type RequestItem = PayrollRow["deductions"][number];
+type Detail =
+  | { kind: "request"; row: PayrollRow; item: RequestItem }
+  | { kind: "late"; row: PayrollRow; item: LateDeduction };
+
+const days = (value: number) => `${value} ${value === 1 ? "day" : "days"}`;
+const stamp = (value: string, timezone: string) =>
+  new Intl.DateTimeFormat("en", {
+    timeZone: timezone,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+const lateOutcome = (item: LateDeduction) =>
+  item.exemption === "free-allowance"
+    ? "free allowance"
+    : item.exemption === "approved-request"
+      ? "covered by approved request"
+      : days(item.days);
+const message = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 const money = (value: number | null, currency: string) =>
   value === null
@@ -48,6 +79,9 @@ export function Payroll({
     revision: number;
     version: number;
   } | null>(null);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   useEffect(() => {
     if (!month) return;
     let alive = true;
@@ -72,6 +106,7 @@ export function Payroll({
       ? result.run
       : null;
   const rows = run?.rows ?? null;
+  const visible = pageSlice(rows ?? [], page, pageSize);
   const failed =
     !rows &&
     failure?.month === month &&
@@ -101,6 +136,8 @@ export function Payroll({
                 onChange={(event) => {
                   setMonth(event.target.value);
                   setEditing(null);
+                  setDetail(null);
+                  setPage(1);
                   setApproving(null);
                   setBankExport(false);
                 }}
@@ -208,7 +245,7 @@ export function Payroll({
             </tr>
           </thead>
           <tbody>
-            {rows?.map((row) => (
+            {rows && visible.rows.map((row) => (
               <tr key={row.employeeId}>
                 <td>
                   <strong>{row.name}</strong>
@@ -225,12 +262,22 @@ export function Payroll({
                     <details>
                       <summary>Request breakdown</summary>
                       {row.deductions.map((item) => (
-                        <p key={item.requestId}>
+                        <button
+                          key={item.requestId}
+                          type="button"
+                          className="payroll-item"
+                          aria-haspopup="dialog"
+                          title="View request details"
+                          onClick={() =>
+                            setDetail({ kind: "request", row, item })
+                          }
+                        >
+                          {item.type ? `${requestNames[item.type]} · ` : ""}
                           {item.status}: {item.days}{" "}
                           {item.days === 1 ? "day" : "days"}
                           <br />
-                          Request {item.requestId}
-                        </p>
+                          <span className="muted">View request details</span>
+                        </button>
                       ))}
                     </details>
                   )}
@@ -238,14 +285,17 @@ export function Payroll({
                     <details>
                       <summary>Late arrivals</summary>
                       {row.lateDeductions!.map((item) => (
-                        <p key={item.attendanceId}>
+                        <button
+                          key={item.attendanceId}
+                          type="button"
+                          className="payroll-item"
+                          aria-haspopup="dialog"
+                          title="View late arrival details"
+                          onClick={() => setDetail({ kind: "late", row, item })}
+                        >
                           {item.workDate}: {item.minutesLate} min late ·{" "}
-                          {item.exemption === "free-allowance"
-                            ? "free allowance"
-                            : item.exemption === "approved-request"
-                              ? "covered by approved request"
-                              : `${item.days} ${item.days === 1 ? "day" : "days"}`}
-                        </p>
+                          {lateOutcome(item)}
+                        </button>
                       ))}
                     </details>
                   )}
@@ -287,6 +337,21 @@ export function Payroll({
           </tbody>
         </table>
       </div>
+      <Pager
+        label="Payroll pages"
+        noun={["employee", "employees"]}
+        page={visible.page}
+        pages={visible.pages}
+        start={visible.start}
+        shown={visible.rows.length}
+        total={visible.total}
+        pageSize={visible.size}
+        onPage={setPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
       {!rows && (
         <p role="status">
           {failed
@@ -310,6 +375,24 @@ export function Payroll({
           run={approving}
           close={() => setApproving(null)}
           refresh={() => setVersion((value) => value + 1)}
+        />
+      )}
+      {detail?.kind === "request" && run && (
+        <RequestDetail
+          key={detail.item.requestId}
+          row={detail.row}
+          item={detail.item}
+          run={run}
+          close={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === "late" && run && (
+        <LateArrivalDetail
+          key={detail.item.attendanceId}
+          row={detail.row}
+          item={detail.item}
+          run={run}
+          close={() => setDetail(null)}
         />
       )}
       {editing && (
@@ -517,6 +600,271 @@ function DeductionEditor({
           </button>
         </footer>
       </form>
+    </Modal>
+  );
+}
+
+function AdjustmentField({
+  adjustment,
+  timezone,
+}: {
+  adjustment: DeductionAdjustment;
+  timezone: string;
+}) {
+  return (
+    <Field label="Deduction adjustment">
+      <span className="request-reason">
+        Changed from {days(adjustment.originalDays)} by {adjustment.by},{" "}
+        {stamp(adjustment.at, timezone)}
+        <br />
+        Reason: {adjustment.reason}
+      </span>
+    </Field>
+  );
+}
+
+function PayrollFields({
+  row,
+  item,
+  run,
+}: {
+  row: PayrollRow;
+  item: { days: number; adjustment?: DeductionAdjustment | null };
+  run: PayrollRun;
+}) {
+  return (
+    <>
+      <Field label={`Applied in ${run.month} payroll`}>
+        <span>
+          {days(item.days)}
+          {row.dailyRate !== null &&
+            item.days > 0 &&
+            ` · about ${money(
+              Math.round(row.dailyRate * item.days * 100) / 100,
+              row.currency,
+            )}`}
+          {run.status === "approved" && " (approved and locked)"}
+        </span>
+      </Field>
+      {item.adjustment && (
+        <AdjustmentField adjustment={item.adjustment} timezone={run.timezone} />
+      )}
+    </>
+  );
+}
+
+function DetailState({
+  title,
+  error,
+  close,
+}: {
+  title: string;
+  error: string;
+  close: () => void;
+}) {
+  return (
+    <Modal title={title} close={close}>
+      <div className="form-grid">
+        {error ? (
+          <p className="message error" role="alert">
+            {error}
+          </p>
+        ) : (
+          <p role="status">Loading details...</p>
+        )}
+      </div>
+      <footer className="modal-footer">
+        <button type="button" className="button secondary" onClick={close}>
+          Close
+        </button>
+      </footer>
+    </Modal>
+  );
+}
+
+function RequestDetail({
+  row,
+  item,
+  run,
+  close,
+}: {
+  row: PayrollRow;
+  item: RequestItem;
+  run: PayrollRun;
+  close: () => void;
+}) {
+  const [request, setRequest] = useState<EmployeeRequest | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    api<EmployeeRequest>(`/requests/${encodeURIComponent(item.requestId)}`)
+      .then((value) => {
+        if (alive) setRequest(value);
+      })
+      .catch((e) => {
+        if (alive) setError(message(e, "Unable to load request"));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [item.requestId]);
+  if (!request)
+    return (
+      <DetailState
+        title={item.type ? requestNames[item.type] : "Request details"}
+        error={error}
+        close={close}
+      />
+    );
+  return (
+    <RequestReview
+      request={request}
+      timezone={run.timezone}
+      canDecide={false}
+      canWithdraw={false}
+      canManagerReview={false}
+      close={close}
+      saved={async () => {}}
+      extra={
+        <>
+          <PayrollFields row={row} item={item} run={run} />
+          {item.decidedAt && (
+            <Field label="Counted in payroll from">
+              <span>HR decision on {stamp(item.decidedAt, run.timezone)}</span>
+            </Field>
+          )}
+        </>
+      }
+    />
+  );
+}
+
+function LateArrivalDetail({
+  row,
+  item,
+  run,
+  close,
+}: {
+  row: PayrollRow;
+  item: LateDeduction;
+  run: PayrollRun;
+  close: () => void;
+}) {
+  const [record, setRecord] = useState<Attendance | null>(null);
+  const [policy, setPolicy] = useState<DeductionPolicy | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const query = new URLSearchParams({
+      from: item.workDate,
+      to: item.workDate,
+      employeeId: row.employeeId,
+    });
+    api<Attendance[]>(`/attendance?${query}`)
+      .then((rows) => {
+        if (!alive) return;
+        const found = rows.find((r) => r.id === item.attendanceId);
+        if (found) setRecord(found);
+        else setError("This attendance record is no longer available.");
+      })
+      .catch((e) => {
+        if (alive) setError(message(e, "Unable to load attendance"));
+      });
+    api<DeductionPolicy>("/deduction-policy")
+      .then((value) => {
+        if (alive) setPolicy(value);
+      })
+      // The rule summary is optional context.
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [item.attendanceId, item.workDate, row.employeeId]);
+  const title = `Late arrival · ${dateLabel(item.workDate)}`;
+  if (!record) return <DetailState title={title} error={error} close={close} />;
+  const late = policy?.lateArrival;
+  const location = locationLabel(record);
+  return (
+    <Modal title={title} close={close}>
+      <div className="form-grid">
+        <Field label="Employee">
+          <span>
+            {row.name} / {row.employeeNumber} / {row.department}
+          </span>
+        </Field>
+        <Field label="Status">
+          <Badge value={record.status} />
+        </Field>
+        <Field label="Work date">
+          <span>{dateLabel(record.workDate)}</span>
+        </Field>
+        {record.branchName && (
+          <Field label="Branch">
+            <span>{record.branchName}</span>
+          </Field>
+        )}
+        <Field label="Check-in">
+          <span>
+            {time(record.checkIn, record.timezone)} ({record.timezone})
+          </span>
+        </Field>
+        <Field label="Check-out">
+          <span>{time(record.checkOut, record.timezone)}</span>
+        </Field>
+        <Field label="Hours worked">
+          <span>{record.hours ?? "Not checked out"}</span>
+        </Field>
+        {location && (
+          <Field label="Location">
+            <span>{location}</span>
+          </Field>
+        )}
+        <Field label="Minutes late">
+          <span>{item.minutesLate} min</span>
+        </Field>
+        <Field label="Payroll outcome">
+          <span>
+            {item.exemption === "free-allowance"
+              ? `No deduction: within the free allowance${
+                  late ? ` of ${late.freeLatesPerMonth} per month` : ""
+                }`
+              : item.exemption === "approved-request"
+                ? "No deduction: covered by an approved request for this date"
+                : `Deducted by the late-arrival rules${
+                    item.automaticDays !== undefined
+                      ? `: ${days(item.automaticDays)}`
+                      : ""
+                  }`}
+          </span>
+        </Field>
+        <PayrollFields row={row} item={item} run={run} />
+        {late && (
+          <Field label="Current late-arrival rules">
+            <span className="request-reason">
+              {late.enabled
+                ? `${late.freeLatesPerMonth} free per month${
+                    late.exemptApprovedRequests
+                      ? "; dates covered by approved requests are exempt"
+                      : ""
+                  }. ${late.tiers
+                    .map((t) => `${t.fromMinutes}+ min: ${days(t.days)}`)
+                    .join(", ")}`
+                : "Late-arrival deductions are currently off"}
+            </span>
+          </Field>
+        )}
+        {run.status === "approved" && (
+          <p className="muted">
+            Payroll values are as approved. Attendance shows the current
+            record, which may have been corrected since.
+          </p>
+        )}
+      </div>
+      <footer className="modal-footer">
+        <button type="button" className="button secondary" onClick={close}>
+          Close
+        </button>
+      </footer>
     </Modal>
   );
 }

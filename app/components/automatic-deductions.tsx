@@ -7,6 +7,7 @@ import {
   type AutomaticDeduction,
 } from "../../lib/api";
 import { Badge, Field, Modal } from "./modal";
+import { PAGE_SIZES, Pager, pageSlice } from "./pager";
 
 const daysLabel = (days: number) => `${days} ${days === 1 ? "day" : "days"}`;
 const monthLabel = (month: string) =>
@@ -55,6 +56,8 @@ export function AutomaticDeductions({
     item: AutomaticDeduction;
     remove: boolean;
   } | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   const key = `${month}:${revision}:${version}`;
   useEffect(() => {
     if (!month) return;
@@ -77,6 +80,7 @@ export function AutomaticDeductions({
   }, [month, key, onError]);
   const rows = items?.key === key ? items.rows : null;
   const locked = rows?.some((row) => row.locked) ?? false;
+  const visible = pageSlice(rows ?? [], page, pageSize);
   const dateText = (value: string | null, source: AutomaticDeduction["source"]) =>
     !value
       ? "--"
@@ -99,7 +103,10 @@ export function AutomaticDeductions({
                 type="month"
                 value={month}
                 required
-                onChange={(event) => setMonth(event.target.value)}
+                onChange={(event) => {
+                  setMonth(event.target.value);
+                  setPage(1);
+                }}
               />
             </Field>
           </div>
@@ -147,7 +154,7 @@ export function AutomaticDeductions({
                 </td>
               </tr>
             )}
-            {rows?.map((item) => (
+            {rows && visible.rows.map((item) => (
               <tr key={`${item.source}:${item.id}`}>
                 <td>
                   <strong>{item.employeeName}</strong>
@@ -211,6 +218,21 @@ export function AutomaticDeductions({
           </tbody>
         </table>
       </div>
+      <Pager
+        label="Automatic deduction pages"
+        noun={["deduction", "deductions"]}
+        page={visible.page}
+        pages={visible.pages}
+        start={visible.start}
+        shown={visible.rows.length}
+        total={visible.total}
+        pageSize={visible.size}
+        onPage={setPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      />
       {editing && (
         <AdjustmentEditor
           item={editing.item}

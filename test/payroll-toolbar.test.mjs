@@ -17,6 +17,33 @@ const code = ts.transpileModule(
     },
   },
 ).outputText;
+// Imports are mocked as empty modules; payroll needs the real page maths.
+const pagerModule = loadPager();
+function loadPager() {
+  const exports = {};
+  const jsx = (type, props) => ({ type, props });
+  vm.runInNewContext(
+    ts.transpileModule(
+      readFileSync(
+        new URL("../app/components/pager.tsx", import.meta.url),
+        "utf8",
+      ),
+      {
+        compilerOptions: {
+          module: ts.ModuleKind.CommonJS,
+          jsx: ts.JsxEmit.ReactJSX,
+          target: ts.ScriptTarget.ES2022,
+        },
+      },
+    ).outputText,
+    {
+      exports,
+      require: (name) =>
+        name === "react/jsx-runtime" ? { jsx, jsxs: jsx } : {},
+    },
+  );
+  return exports;
+}
 function render({
   rows = [{ grossSalary: 0 }],
   month = "2026-11",
@@ -71,7 +98,9 @@ function render({
           }
         : name === "react/jsx-runtime"
           ? { jsx, jsxs: jsx }
-          : {},
+          : name === "./pager"
+            ? pagerModule
+            : {},
   };
   vm.runInNewContext(code, context);
   const tree = context.exports.Payroll({
@@ -131,4 +160,22 @@ test("preserves approval permissions and both action handlers", () => {
   assert.equal(ready.changes.get(3), true);
   assert.equal(approval(render({ canApprove: false }).nodes), undefined);
   assert.equal(approval(render({ status: "approved" }).nodes), undefined);
+});
+test("pages payroll rows without dropping any employee", () => {
+  const rows = Array.from({ length: 60 }, () => ({ grossSalary: 0 }));
+  const { nodes } = render({ rows });
+  const pager = nodes.find((node) => node.props?.label === "Payroll pages");
+  assert.equal(pager.props.total, 60);
+  assert.equal(pager.props.pages, 2);
+  assert.equal(pager.props.shown, 50);
+  assert.equal(
+    nodes.filter((node) => node.type === "tbody")[0].props.children.length,
+    50,
+  );
+  const { pageSlice } = pagerModule;
+  const second = pageSlice(rows, 2, 50);
+  assert.equal(second.rows.length, 10);
+  assert.equal(second.start, 50);
+  assert.equal(pageSlice(rows, 9, 50).page, 2, "out-of-range pages clamp to the last page");
+  assert.equal(pageSlice([], 3, 50).page, 1);
 });

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ClipboardList, Check, X, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   api,
+  apiPage,
   save,
   dateLabel,
   time,
@@ -23,6 +24,7 @@ const names = {
   mission: "Mission",
   "forgotten-check-out": "Forgotten check-out",
 };
+export { names as requestNames };
 const stamp = (value: string, timezone: string) =>
   new Intl.DateTimeFormat("en", {
     timeZone: timezone,
@@ -262,10 +264,16 @@ export function Requests({
   const [result, setResult] = useState<{
     key: string;
     rows: EmployeeRequest[];
+    total?: number | null;
     error?: boolean;
   } | null>(null);
   const loaded = result?.key === pageKey;
   const rows = loaded ? result.rows : [];
+  const total = loaded ? (result.total ?? null) : null;
+  const start = cursors.length * pageSize;
+  const pages = total === null ? null : Math.max(1, Math.ceil(total / pageSize));
+  const hasNext =
+    total === null ? rows.length >= pageSize : start + rows.length < total;
   useEffect(() => {
     let alive = true;
     const path = manager
@@ -278,9 +286,10 @@ export function Requests({
       ...(status ? { status } : {}),
       ...(before ? { before } : {}),
     });
-    api<EmployeeRequest[]>(`${path}?${query}`)
-      .then((items) => {
-        if (alive) setResult({ key: pageKey, rows: items });
+    apiPage<EmployeeRequest>(`${path}?${query}`)
+      .then((page) => {
+        if (alive)
+          setResult({ key: pageKey, rows: page.rows, total: page.total });
       })
       .catch((e) => {
         if (alive) {
@@ -332,7 +341,11 @@ export function Requests({
             {loaded
               ? result.error
                 ? "Unable to load requests"
-                : `${rows.length} ${rows.length === 1 ? "request" : "requests"} on this page`
+                : total !== null
+                  ? total === 0
+                    ? "0 requests"
+                    : `Showing ${start + 1}–${start + rows.length} of ${total} ${total === 1 ? "request" : "requests"}`
+                  : `${rows.length} ${rows.length === 1 ? "request" : "requests"} on this page`
               : "Loading requests…"}
           </span>
           <label className="request-page-size">
@@ -357,16 +370,27 @@ export function Requests({
               type="button"
               className="button secondary"
               disabled={!loaded || !cursors.length}
+              onClick={() => setPagination({ key: listKey, cursors: [] })}
+            >
+              First
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={!loaded || !cursors.length}
               onClick={() => setPagination({ key: listKey, cursors: cursors.slice(0, -1) })}
             >
               <ChevronLeft size={16} aria-hidden="true" />
               Previous
             </button>
-            <span className="request-page-number">Page {cursors.length + 1}</span>
+            <span className="request-page-number">
+              Page {cursors.length + 1}
+              {pages !== null ? ` of ${pages}` : ""}
+            </span>
             <button
               type="button"
               className="button secondary"
-              disabled={!loaded || rows.length < pageSize}
+              disabled={!loaded || !hasNext || !rows.length}
               onClick={() => setPagination({ key: listKey, cursors: [...cursors, rows[rows.length - 1].id] })}
             >
               Next
@@ -467,9 +491,10 @@ export function Requests({
   );
 }
 
-function RequestReview({
+export function RequestReview({
   request,
   timezone,
+  extra,
   canDecide,
   canWithdraw,
   canManagerReview,
@@ -483,6 +508,8 @@ function RequestReview({
   canManagerReview: boolean;
   close: () => void;
   saved: () => Promise<void>;
+  /** Extra read-only fields, shown after the salary deduction. */
+  extra?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -602,6 +629,7 @@ function RequestReview({
           <Field label="Salary deduction">
             <span>{deduction(request)}</span>
           </Field>
+          {extra}
           {canDecide && request.status === "pending" && (
             <p>
               {rule

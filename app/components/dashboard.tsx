@@ -55,6 +55,7 @@ import Link from "next/link";
 import { CorrectionEditor, EmployeeEditor, ScheduleEditor } from "./editors";
 import { EmployeeImport } from "./employee-import";
 import { EmployeeDelete } from "./employee-delete";
+import { EmployeeProfile } from "./employee-profile";
 import { Requests } from "./requests";
 import { Payroll } from "./payroll";
 import { DeductionRules } from "./deduction-rules";
@@ -171,6 +172,7 @@ export default function Dashboard() {
   );
   const [employeeImport, setEmployeeImport] = useState(false);
   const [employeeDeletion, setEmployeeDeletion] = useState<Employee | null>(null);
+  const [employeeProfile, setEmployeeProfile] = useState<Employee | null>(null);
   const [scheduleEditor, setScheduleEditor] = useState<Schedule | "new" | null>(
     null,
   );
@@ -185,6 +187,7 @@ export default function Dashboard() {
       setSchedules([]);
       setEmployeeEditor(null);
       setEmployeeDeletion(null);
+      setEmployeeProfile(null);
       setCorrection(null);
       setScheduleEditor(null);
     }
@@ -350,6 +353,7 @@ export default function Dashboard() {
       setSchedules([]);
       setEmployeeEditor(null);
       setEmployeeDeletion(null);
+      setEmployeeProfile(null);
       setCorrection(null);
       setScheduleEditor(null);
       setBranchId("");
@@ -1150,7 +1154,14 @@ export default function Dashboard() {
                           <div className="person">
                             <span className="avatar">{initials(e.name)}</span>
                             <div>
-                              <strong>{e.name}</strong>
+                              <button
+                                type="button"
+                                className="employee-name-link"
+                                title={`View history for ${e.name}`}
+                                onClick={() => setEmployeeProfile(e)}
+                              >
+                                {e.name}
+                              </button>
                               <span>
                                 {e.employeeNumber} / {e.nationalId} / {e.email}
                               </span>
@@ -1172,6 +1183,15 @@ export default function Dashboard() {
                           <Badge value={e.active ? "Active" : "Inactive"} />
                         </td>
                         <td>
+                          <button
+                            className="icon-button"
+                            type="button"
+                            title={`View history for ${e.name}`}
+                            aria-label={`View history for ${e.name}`}
+                            onClick={() => setEmployeeProfile(e)}
+                          >
+                            <History size={16} />
+                          </button>
                           <button
                             className="icon-button"
                             title={`Edit ${e.name}`}
@@ -1408,6 +1428,18 @@ export default function Dashboard() {
           <span>People & attendance</span>
         </footer>
       </div>
+      {employeeProfile && (
+        <EmployeeProfile
+          key={employeeProfile.id}
+          employee={employeeProfile}
+          employees={employees}
+          schedules={schedules}
+          branches={branches}
+          today={session.today}
+          timezone={session.company.timezone}
+          close={() => setEmployeeProfile(null)}
+        />
+      )}
       {employeeDeletion && <EmployeeDelete employee={employeeDeletion} close={() => setEmployeeDeletion(null)} deleted={() => {
         setEmployees(current => current.filter(employee => employee.id !== employeeDeletion.id));
         setRequestRevision(value => value + 1);

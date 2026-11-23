@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2 } from "lucide-react";
 import {
   api,
   save,
@@ -34,6 +34,26 @@ const describe = (item: AutomaticDeduction) => {
   const [type, status] = item.detail.split(" ");
   return `${requestTypes[type] ?? "Request"} request ${status ?? ""}`.trim();
 };
+const reasonKey = (item: AutomaticDeduction) =>
+  item.source === "late" ? "late" : item.detail.split(" ")[0];
+const reasonLabel = (key: string) =>
+  key === "late" ? "Late arrival" : (requestTypes[key] ?? "Other request");
+const changeState = (item: AutomaticDeduction) =>
+  !item.adjustment ? "unchanged" : item.days === 0 ? "removed" : "edited";
+const matchesSearch = (item: AutomaticDeduction, search: string) => {
+  const text =
+    `${item.employeeName} ${item.employeeNumber} ${item.department}`.toLocaleLowerCase();
+  return search
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((term) => text.includes(term));
+};
+// Keep the current choice listed when a new month has no rows for it.
+const optionsFrom = (values: string[], selected: string) =>
+  [...new Set(selected ? [...values, selected] : values)].sort((a, b) =>
+    a.localeCompare(b),
+  );
 
 export function AutomaticDeductions({
   today,
@@ -58,6 +78,10 @@ export function AutomaticDeductions({
   } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
+  const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("");
+  const [reason, setReason] = useState("");
+  const [change, setChange] = useState("");
   const key = `${month}:${revision}:${version}`;
   useEffect(() => {
     if (!month) return;
@@ -80,7 +104,27 @@ export function AutomaticDeductions({
   }, [month, key, onError]);
   const rows = items?.key === key ? items.rows : null;
   const locked = rows?.some((row) => row.locked) ?? false;
-  const visible = pageSlice(rows ?? [], page, pageSize);
+  const filtered = (rows ?? []).filter(
+    (item) =>
+      (!department || item.department === department) &&
+      (!reason || reasonKey(item) === reason) &&
+      (!change || changeState(item) === change) &&
+      matchesSearch(item, search),
+  );
+  const visible = pageSlice(filtered, page, pageSize);
+  const departments = optionsFrom(
+    (rows ?? []).map((item) => item.department),
+    department,
+  );
+  const reasons = optionsFrom((rows ?? []).map(reasonKey), reason);
+  const filtering = Boolean(search.trim() || department || reason || change);
+  const clearFilters = () => {
+    setSearch("");
+    setDepartment("");
+    setReason("");
+    setChange("");
+    setPage(1);
+  };
   const dateText = (value: string | null, source: AutomaticDeduction["source"]) =>
     !value
       ? "--"
@@ -111,6 +155,86 @@ export function AutomaticDeductions({
             </Field>
           </div>
         </div>
+        <div className="deduction-filters">
+          <div className="field deduction-search-field">
+            <span>Search</span>
+            <label className="search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search deductions by employee name, ID, or department"
+                placeholder="Name, employee ID, or department"
+                maxLength={100}
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+          </div>
+          <Field label="Department">
+            <select
+              value={department}
+              onChange={(event) => {
+                setDepartment(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All departments</option>
+              {departments.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Reason">
+            <select
+              value={reason}
+              onChange={(event) => {
+                setReason(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All reasons</option>
+              {reasons.map((value) => (
+                <option key={value} value={value}>
+                  {reasonLabel(value)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Change status">
+            <select
+              value={change}
+              onChange={(event) => {
+                setChange(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All statuses</option>
+              <option value="unchanged">Not changed</option>
+              <option value="edited">Edited</option>
+              <option value="removed">Removed</option>
+            </select>
+          </Field>
+          <button
+            type="button"
+            className="button secondary"
+            disabled={!filtering}
+            onClick={clearFilters}
+          >
+            Clear filters
+          </button>
+        </div>
+        <p className="deduction-filter-count" role="status">
+          {rows === null
+            ? "Loading deductions..."
+            : filtering
+              ? `${filtered.length} of ${rows.length} ${rows.length === 1 ? "deduction" : "deductions"} match`
+              : `${rows.length} ${rows.length === 1 ? "deduction" : "deductions"}`}
+        </p>
       </div>
       <p className="muted">
         Deductions the system applied from request decisions and late arrivals,
@@ -151,6 +275,13 @@ export function AutomaticDeductions({
               <tr>
                 <td colSpan={7} className="muted">
                   No automatic deductions for {monthLabel(month)}.
+                </td>
+              </tr>
+            )}
+            {rows && rows.length > 0 && filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="muted">
+                  No deductions match your search and filters.
                 </td>
               </tr>
             )}

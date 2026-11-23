@@ -89,6 +89,29 @@ export type PayrollRow = {
   }[];
   manualDeductions: PayrollDeduction[];
   lateDeductions?: LateDeduction[];
+  /** Present only when the absence rule was on for this payroll. */
+  absenceDeductions?: AbsenceDeduction[];
+};
+export type AbsenceDeduction = {
+  workDate: string;
+  status: "absent" | "held" | "covered";
+  cause:
+    | "no-record"
+    | "pending-request"
+    | "approved-excuse"
+    | "rejected-request";
+  requestType: string | null;
+  automaticDays: number;
+  days: number;
+  adjustment: DeductionAdjustment | null;
+};
+export type NeverCheckedIn = {
+  employeeId: string;
+  employeeName: string;
+  employeeNumber: string;
+  department: string;
+  branchName: string | null;
+  startDate: string;
 };
 export type LateDeduction = {
   attendanceId: string;
@@ -497,6 +520,12 @@ export type DeductionPolicyRules = {
     exemptApprovedRequests: boolean;
     tiers: { fromMinutes: number; days: number }[];
   };
+  absence: {
+    enabled: boolean;
+    daysPerAbsence: number;
+    effectiveFrom: string | null;
+    excludedDates: string[];
+  };
 };
 export type DeductionPolicy = DeductionPolicyRules & {
   updatedAt: string | null;
@@ -510,7 +539,7 @@ export type DeductionAdjustment = {
   at: string;
 };
 export type AutomaticDeduction = {
-  source: "request" | "late";
+  source: "request" | "late" | "absence";
   id: string;
   employeeId: string;
   employeeName: string;
@@ -522,4 +551,8 @@ export type AutomaticDeduction = {
   days: number;
   adjustment: DeductionAdjustment | null;
   locked: boolean;
+  /** Absence rows only. */
+  workDate?: string;
+  absenceStatus?: AbsenceDeduction["status"];
+  editable?: boolean;
 };

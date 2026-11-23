@@ -8,6 +8,7 @@ import {
   dateLabel,
   locationLabel,
   time,
+  type AbsenceDeduction,
   type Attendance,
   type DeductionAdjustment,
   type DeductionPolicy,
@@ -24,7 +25,8 @@ import { PAGE_SIZES, Pager, pageSlice } from "./pager";
 type RequestItem = PayrollRow["deductions"][number];
 type Detail =
   | { kind: "request"; row: PayrollRow; item: RequestItem }
-  | { kind: "late"; row: PayrollRow; item: LateDeduction };
+  | { kind: "late"; row: PayrollRow; item: LateDeduction }
+  | { kind: "absence"; row: PayrollRow; item: AbsenceDeduction };
 
 const days = (value: number) => `${value} ${value === 1 ? "day" : "days"}`;
 const stamp = (value: string, timezone: string) =>
@@ -39,6 +41,20 @@ const lateOutcome = (item: LateDeduction) =>
     : item.exemption === "approved-request"
       ? "covered by approved request"
       : days(item.days);
+const absenceOutcome = (item: AbsenceDeduction) =>
+  item.status === "held"
+    ? `held for review · ${days(item.days)}`
+    : item.status === "covered"
+      ? "covered by rejected request"
+      : days(item.days);
+const absenceExplanation = (item: AbsenceDeduction) =>
+  item.cause === "no-record"
+    ? "Scheduled workday with no check-in and no request"
+    : item.cause === "pending-request"
+      ? `Held for review: ${item.requestType ?? "a"} request is pending`
+      : item.cause === "approved-excuse"
+        ? "Held for review: approved excuse is partial-day permission"
+        : `Not charged again: the rejected ${item.requestType ?? ""} request already carries its deduction`;
 const message = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
@@ -299,6 +315,25 @@ export function Payroll({
                       ))}
                     </details>
                   )}
+                  {(row.absenceDeductions?.length ?? 0) > 0 && (
+                    <details>
+                      <summary>Absences</summary>
+                      {row.absenceDeductions!.map((item) => (
+                        <button
+                          key={item.workDate}
+                          type="button"
+                          className="payroll-item"
+                          aria-haspopup="dialog"
+                          title="View absence details"
+                          onClick={() =>
+                            setDetail({ kind: "absence", row, item })
+                          }
+                        >
+                          {item.workDate}: {absenceOutcome(item)}
+                        </button>
+                      ))}
+                    </details>
+                  )}
                   {row.manualDeductions.length > 0 && (
                     <details>
                       <summary>HR deductions</summary>
@@ -389,6 +424,15 @@ export function Payroll({
       {detail?.kind === "late" && run && (
         <LateArrivalDetail
           key={detail.item.attendanceId}
+          row={detail.row}
+          item={detail.item}
+          run={run}
+          close={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === "absence" && run && (
+        <AbsenceDetail
+          key={detail.item.workDate}
           row={detail.row}
           item={detail.item}
           run={run}
@@ -736,6 +780,42 @@ function RequestDetail({
         </>
       }
     />
+  );
+}
+
+function AbsenceDetail({
+  row,
+  item,
+  run,
+  close,
+}: {
+  row: PayrollRow;
+  item: AbsenceDeduction;
+  run: PayrollRun;
+  close: () => void;
+}) {
+  return (
+    <Modal title={`Absence · ${dateLabel(item.workDate)}`} close={close}>
+      <div className="form-grid">
+        <Field label="Employee">
+          <span>
+            {row.name} / {row.employeeNumber} / {row.department}
+          </span>
+        </Field>
+        <Field label="Work date">
+          <span>{dateLabel(item.workDate)}</span>
+        </Field>
+        <Field label="Payroll outcome">
+          <span>{absenceExplanation(item)}</span>
+        </Field>
+        <PayrollFields row={row} item={item} run={run} />
+      </div>
+      <footer className="modal-footer">
+        <button type="button" className="button secondary" onClick={close}>
+          Close
+        </button>
+      </footer>
+    </Modal>
   );
 }
 

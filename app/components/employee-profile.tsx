@@ -380,12 +380,15 @@ function PayrollTab({ employee, today }: { employee: Employee; today: string }) 
           />
           <section>
             <h3>Deductions</h3>
-            {!row.deductions.length && !row.manualDeductions.length && !row.lateDeductions?.length && <p className="muted">No deductions this month.</p>}
+            {!row.deductions.length && !row.manualDeductions.length && !row.lateDeductions?.length && !row.absenceDeductions?.length && <p className="muted">No deductions this month.</p>}
             {row.deductions.map((item) => (
               <div className="profile-line" key={item.requestId}><strong>{item.type ? requestNames[item.type] : "Request"} ({item.status})</strong><span>{item.days} days</span></div>
             ))}
             {row.lateDeductions?.map((item) => (
               <div className="profile-line" key={item.attendanceId}><strong>Late {item.minutesLate} min, {dateLabel(item.workDate)}</strong><span>{item.days} days{item.exemption ? " (exempt)" : ""}</span></div>
+            ))}
+            {row.absenceDeductions?.map((item) => (
+              <div className="profile-line" key={item.workDate}><strong>Absence, {dateLabel(item.workDate)}</strong><span>{item.days} days{item.status === "held" ? " (held for review)" : item.status === "covered" ? " (covered by request)" : ""}</span></div>
             ))}
             {row.manualDeductions.map((item) => (
               <div className="profile-line" key={item.id}><strong>{item.reason}</strong><span>{item.days} days, approved by {item.approvedBy}</span></div>

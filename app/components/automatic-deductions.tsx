@@ -5,6 +5,7 @@ import {
   api,
   save,
   type AutomaticDeduction,
+  type NeverCheckedIn,
 } from "../../lib/api";
 import { Badge, Field, Modal } from "./modal";
 import { PAGE_SIZES, Pager, pageSlice } from "./pager";
@@ -30,10 +31,20 @@ const requestTypes: Record<string, string> = {
 };
 // The API sends "<type> <status>" for requests; show it in plain words.
 const describe = (item: AutomaticDeduction) => {
-  if (item.source === "late") return item.detail;
+  if (item.source !== "request") return item.detail;
   const [type, status] = item.detail.split(" ");
   return `${requestTypes[type] ?? "Request"} request ${status ?? ""}`.trim();
 };
+
+const dateOnly = (value: string) =>
+  new Intl.DateTimeFormat("en", {
+    timeZone: "UTC",
+    dateStyle: "medium",
+  }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
+const adjustmentPath = (item: AutomaticDeduction) =>
+  item.source === "absence"
+    ? `/payroll/absence-deductions/${item.employeeId}/${item.workDate}`
+    : `/payroll/automatic-deductions/${item.source}/${item.id}`;
 
 export function AutomaticDeductions({
   today,
@@ -51,6 +62,10 @@ export function AutomaticDeductions({
   const [items, setItems] = useState<{
     key: string;
     rows: AutomaticDeduction[];
+  } | null>(null);
+  const [never, setNever] = useState<{
+    key: string;
+    rows: NeverCheckedIn[];
   } | null>(null);
   const [editing, setEditing] = useState<{
     item: AutomaticDeduction;
@@ -78,17 +93,34 @@ export function AutomaticDeductions({
       alive = false;
     };
   }, [month, key, onError]);
+  useEffect(() => {
+    if (!month) return;
+    let alive = true;
+    api<NeverCheckedIn[]>(
+      `/payroll/never-checked-in?month=${encodeURIComponent(month)}`,
+    )
+      .then((rows) => {
+        if (alive) setNever({ key, rows });
+      })
+      .catch((error) => {
+        if (alive) {
+          setNever({ key, rows: [] });
+          onError(error);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [month, key, onError]);
   const rows = items?.key === key ? items.rows : null;
+  const neverRows = never?.key === key ? never.rows : null;
   const locked = rows?.some((row) => row.locked) ?? false;
   const visible = pageSlice(rows ?? [], page, pageSize);
   const dateText = (value: string | null, source: AutomaticDeduction["source"]) =>
     !value
       ? "--"
-      : source === "late"
-        ? new Intl.DateTimeFormat("en", {
-            timeZone: "UTC",
-            dateStyle: "medium",
-          }).format(new Date(`${value}T00:00:00Z`))
+      : source !== "request"
+        ? dateOnly(value)
         : new Intl.DateTimeFormat("en", {
             timeZone: timezone,
             dateStyle: "medium",
@@ -113,8 +145,8 @@ export function AutomaticDeductions({
         </div>
       </div>
       <p className="muted">
-        Deductions the system applied from request decisions and late arrivals,
-        using the Deduction rules. Edit the days or remove a deduction with a
+        Deductions the system applied from request decisions, late arrivals and
+        absences, using the Deduction rules. Edit the days or remove a deduction with a
         reason; every change is recorded in the Activity log and payroll
         updates immediately. Approved payroll months are locked.
       </p>
@@ -162,7 +194,20 @@ export function AutomaticDeductions({
                     {item.employeeNumber} / {item.department}
                   </div>
                 </td>
-                <td>{describe(item)}</td>
+                <td>
+                  {describe(item)}
+                  {item.absenceStatus && item.absenceStatus !== "absent" && (
+                    <div>
+                      <Badge
+                        value={
+                          item.absenceStatus === "held"
+                            ? "held for review"
+                            : "covered"
+                        }
+                      />
+                    </div>
+                  )}
+                </td>
                 <td>{dateText(item.date, item.source)}</td>
                 <td>{daysLabel(item.automaticDays)}</td>
                 <td>
@@ -196,7 +241,7 @@ export function AutomaticDeductions({
                       className="icon-button"
                       title="Edit deduction"
                       aria-label={`Edit deduction for ${item.employeeName}`}
-                      disabled={item.locked}
+                      disabled={item.locked || item.editable === false}
                       onClick={() => setEditing({ item, remove: false })}
                     >
                       <Pencil size={16} />
@@ -206,7 +251,9 @@ export function AutomaticDeductions({
                       className="icon-button"
                       title="Remove deduction"
                       aria-label={`Remove deduction for ${item.employeeName}`}
-                      disabled={item.locked || item.days === 0}
+                      disabled={
+                        item.locked || item.editable === false || item.days === 0
+                      }
                       onClick={() => setEditing({ item, remove: true })}
                     >
                       <Trash2 size={16} />
@@ -233,6 +280,48 @@ export function AutomaticDeductions({
           setPage(1);
         }}
       />
+      <section className="never-checked-in" aria-labelledby="never-checked-in">
+        <h3 id="never-checked-in">Never checked in</h3>
+        <p className="muted">
+          These employees have no attendance in any month, so no absence is
+          charged automatically and payroll is not affected. Follow up with
+          them, or add a manual deduction on the Payroll page if one is due.
+        </p>
+        {neverRows === null ? (
+          <p className="muted">Loading employees...</p>
+        ) : neverRows.length === 0 ? (
+          <p className="muted">
+            Every employee on {monthLabel(month)} payroll has checked in at
+            least once.
+          </p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Branch</th>
+                  <th>Start date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {neverRows.map((person) => (
+                  <tr key={person.employeeId}>
+                    <td>
+                      <strong>{person.employeeName}</strong>
+                      <div className="muted">
+                        {person.employeeNumber} / {person.department}
+                      </div>
+                    </td>
+                    <td>{person.branchName ?? "--"}</td>
+                    <td>{dateOnly(person.startDate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
       {editing && (
         <AdjustmentEditor
           item={editing.item}
@@ -264,14 +353,10 @@ function AdjustmentEditor({
     setBusy(true);
     setError("");
     try {
-      await save(
-        `/payroll/automatic-deductions/${item.source}/${item.id}`,
-        "PATCH",
-        {
-          days: remove ? 0 : Number(form.get("days")),
-          reason: form.get("reason"),
-        },
-      );
+      await save(adjustmentPath(item), "PATCH", {
+        days: remove ? 0 : Number(form.get("days")),
+        reason: form.get("reason"),
+      });
       saved();
       close();
     } catch (failure) {

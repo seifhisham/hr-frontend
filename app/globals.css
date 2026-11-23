@@ -2282,6 +2282,13 @@ tbody tr:hover {
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .automatic-deductions > .muted { max-width: 80ch; line-height: 1.6; margin: 0 0 18px; }
 .automatic-deductions td { vertical-align: top; }
+.never-checked-in { margin-top: 28px; }
+.never-checked-in h3 { margin: 0 0 6px; }
+.never-checked-in > .muted { max-width: 80ch; line-height: 1.6; margin: 0 0 12px; }
+.absence-date-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.absence-date-add input { width: auto; }
+.absence-dates { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.absence-dates li { display: inline-flex; align-items: center; gap: 6px; }
 .automatic-deductions .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .automatic-deductions .icon-button:disabled { opacity: 0.35; cursor: not-allowed; }
 .button.danger { background: #b23b3b; color: #fff; border-color: #b23b3b; }

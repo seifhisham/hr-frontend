@@ -24,6 +24,7 @@ const requestLabels: [RequestRuleType, string][] = [
 const editable = (policy: DeductionPolicy): DeductionPolicyRules => ({
   requests: policy.requests,
   lateArrival: policy.lateArrival,
+  absence: policy.absence,
 });
 
 function DaysInput({
@@ -61,6 +62,7 @@ export function DeductionRules({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [closureDate, setClosureDate] = useState("");
   useEffect(() => {
     let alive = true;
     api<DeductionPolicy>("/deduction-policy")
@@ -78,6 +80,9 @@ export function DeductionRules({
   const late = rules.lateArrival;
   const setLate = (changes: Partial<DeductionPolicyRules["lateArrival"]>) =>
     setRules({ ...rules, lateArrival: { ...late, ...changes } });
+  const absence = rules.absence;
+  const setAbsence = (changes: Partial<DeductionPolicyRules["absence"]>) =>
+    setRules({ ...rules, absence: { ...absence, ...changes } });
   const setRequest = (
     type: RequestRuleType,
     decision: "approved" | "rejected",
@@ -310,6 +315,103 @@ export function DeductionRules({
                 Each late arrival uses the highest tier it reaches.
               </p>
             </>
+          )}
+        </fieldset>
+        <fieldset className="absence-rule">
+          <legend>Absence</legend>
+          <label className="check-label">
+            <input
+              type="checkbox"
+              checked={absence.enabled}
+              onChange={(event) =>
+                setAbsence({ enabled: event.target.checked })
+              }
+            />
+            Deduct salary for scheduled workdays with no check-in or request
+          </label>
+          <p className="muted">
+            Each employee&rsquo;s absence count starts from their own first
+            check-in, so nobody is charged for days before they began using
+            the app. Employees who have never checked in are not charged and
+            appear in the &ldquo;Never checked in&rdquo; list on Automatic
+            deductions. Review every absence there before approving payroll.
+            Applies to draft payroll; approved payroll months stay locked.
+          </p>
+          <Field label="Days deducted per absence">
+            <DaysInput
+              label="Days deducted per absence"
+              value={absence.daysPerAbsence}
+              onChange={(daysPerAbsence) => setAbsence({ daysPerAbsence })}
+            />
+          </Field>
+          <Field label="Count absences from (optional)">
+            <input
+              type="date"
+              value={absence.effectiveFrom ?? ""}
+              onChange={(event) =>
+                setAbsence({ effectiveFrom: event.target.value || null })
+              }
+            />
+          </Field>
+          <p className="muted">
+            This date can only move an employee&rsquo;s start later. An earlier
+            date has no effect, because counting never starts before their
+            first check-in.
+          </p>
+          <Field label="Company holidays and closures">
+            <div className="absence-date-add">
+              <input
+                type="date"
+                aria-label="Holiday or closure date"
+                value={closureDate}
+                onChange={(event) => setClosureDate(event.target.value)}
+              />
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!closureDate}
+                onClick={() => {
+                  setAbsence({
+                    excludedDates: [
+                      ...new Set([...absence.excludedDates, closureDate]),
+                    ].sort(),
+                  });
+                  setClosureDate("");
+                }}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Add date
+              </button>
+            </div>
+          </Field>
+          {absence.excludedDates.length > 0 ? (
+            <ul className="absence-dates">
+              {absence.excludedDates.map((date) => (
+                <li key={date}>
+                  <span>{date}</span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Remove ${date}`}
+                    title="Remove date"
+                    onClick={() =>
+                      setAbsence({
+                        excludedDates: absence.excludedDates.filter(
+                          (value) => value !== date,
+                        ),
+                      })
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">
+              No dates added. The system has no holiday calendar, so add public
+              holidays and closures here before turning this rule on.
+            </p>
           )}
         </fieldset>
         <Field label="Reason for this change">

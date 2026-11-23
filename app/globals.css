@@ -2289,6 +2289,14 @@ tbody tr:hover {
 .absence-date-add input { width: auto; }
 .absence-dates { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .absence-dates li { display: inline-flex; align-items: center; gap: 6px; }
+.deduction-filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto; align-items: end; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.deduction-filters .search { width: 100%; min-height: 44px; border-radius: 8px; }
+.deduction-filters .search input { width: 100%; min-width: 0; }
+.deduction-filters select { min-height: 44px; border-radius: 8px; }
+.deduction-filters .button { min-height: 44px; border-radius: 8px; white-space: nowrap; }
+.deduction-filter-count { margin: 12px 0 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+@media (max-width: 1180px) { .deduction-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } .deduction-search-field { grid-column: 1 / -1; } .deduction-filters .button { grid-column: 1 / -1; justify-self: end; } }
+@media (max-width: 640px) { .deduction-filters { grid-template-columns: minmax(0, 1fr); } .deduction-filters .button { justify-self: stretch; } }
 .automatic-deductions .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .automatic-deductions .icon-button:disabled { opacity: 0.35; cursor: not-allowed; }
 .button.danger { background: #b23b3b; color: #fff; border-color: #b23b3b; }
